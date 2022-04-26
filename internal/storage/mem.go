@@ -39,7 +39,7 @@ func (storage *MemStorage) IncrementCounter(key string, value int64) error {
 
 func (storage *MemStorage) GetCounter(key string) (int64, bool, error) {
 	value, found := storage.counters[key]
-	if found {
+	if !found {
 		return 0, false, nil
 	} else {
 		return value, true, nil
@@ -67,7 +67,7 @@ func (storage *MemStorage) SetGauge(key string, value float64) error {
 
 func (storage *MemStorage) GetGauge(key string) (float64, bool, error) {
 	value, found := storage.gauges[key]
-	if found {
+	if !found {
 		return 0, false, nil
 	} else {
 		return value, true, nil
