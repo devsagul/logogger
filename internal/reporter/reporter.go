@@ -22,12 +22,12 @@ func PostRequest(url string) {
 	start := time.Now()
 	resp, err := http.Post(url, "text/plain", nil)
 	dur := time.Since(start)
-	if err == nil {
-		log.Printf("Got response after %dms", dur.Milliseconds())
-	} else {
+	if err != nil {
 		log.Printf("Got error after %dms", dur.Milliseconds())
+	} else {
+		_ = resp.Body.Close()
+		log.Printf("Got response after %dms", dur.Milliseconds())
 	}
-	_ = resp.Body.Close()
 }
 
 func ReportMetrics(m poller.Metrics, host string) {
