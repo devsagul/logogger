@@ -39,7 +39,7 @@ func ReportMetrics(m poller.Metrics, host string) {
 		var formatString string
 		var url string
 		if metricsType == "gauge" {
-			formatString = "http://%s/update/%s/%s/%0.6f"
+			formatString = "http://%s/update/%s/%s/%f"
 			url = fmt.Sprintf(formatString, host, metricsType, metricsField, metricsValue)
 		} else {
 			formatString = "http://%s/update/%s/%s/%d"

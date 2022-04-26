@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"fmt"
 	"sync"
 )
 
@@ -34,12 +33,12 @@ func (storage *MemStorage) IncrementCounter(key string, value int64) error {
 	return nil
 }
 
-func (storage *MemStorage) GetCounter(key string) (int64, error) {
+func (storage *MemStorage) GetCounter(key string) (int64, bool, error) {
 	value, found := storage.counters[key]
 	if found {
-		return 0, fmt.Errorf("unknown key %s", key)
+		return 0, false, nil
 	} else {
-		return value, nil
+		return value, true, nil
 	}
 }
 
@@ -62,12 +61,12 @@ func (storage *MemStorage) SetGauge(key string, value float64) error {
 	return nil
 }
 
-func (storage *MemStorage) GetGauge(key string) (float64, error) {
+func (storage *MemStorage) GetGauge(key string) (float64, bool, error) {
 	value, found := storage.gauges[key]
 	if found {
-		return 0, fmt.Errorf("unknown key %s", key)
+		return 0, false, nil
 	} else {
-		return value, nil
+		return value, true, nil
 	}
 }
 
