@@ -10,7 +10,7 @@ import (
 const (
 	pollInterval   = 2 * time.Second
 	reportInterval = 10 * time.Second
-	reportHost     = "127.0.0.1:8000"
+	reportHost     = "127.0.0.1:8080"
 )
 
 func main() {
@@ -29,7 +29,7 @@ func main() {
 
 	var m poller.Metrics
 
-	go func() {
+	func() {
 		for {
 			select {
 			case metrics := <-channel:
@@ -41,6 +41,4 @@ func main() {
 			}
 		}
 	}()
-
-	time.Sleep(65 * time.Second)
 }

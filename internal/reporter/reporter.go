@@ -2,6 +2,7 @@ package reporter
 
 import (
 	"fmt"
+	"log"
 	"logogger/internal/poller"
 	"net/http"
 	"reflect"
@@ -17,11 +18,15 @@ type ServerResponse struct {
 }
 
 func PostRequest(url string, ch chan<- ServerResponse) {
+	log.Printf("Sending metrics to %s", url)
 	start := time.Now()
 	resp, err := http.Post(url, "text/plain", nil)
 	dur := time.Since(start)
 	if err == nil {
+		log.Printf("Got response after %dms", dur.Milliseconds())
 		ch <- ServerResponse{url, resp, err, dur}
+	} else {
+		log.Printf("Got error after %dms", dur.Milliseconds())
 	}
 }
 
