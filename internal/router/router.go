@@ -32,6 +32,5 @@ func (r Router) Handle(w http.ResponseWriter, req *http.Request) {
 
 	w.WriteHeader(http.StatusNotFound)
 	body := "Status: ERROR\nNot Found"
-	w.Write([]byte(body))
-	return
+	_, _ = w.Write([]byte(body))
 }

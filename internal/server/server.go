@@ -52,17 +52,16 @@ func (app App) handleGauge(w http.ResponseWriter, r *http.Request, args []string
 	w.WriteHeader(http.StatusOK)
 	body := "Status: OK"
 	_, _ = w.Write([]byte(body))
-	return
 }
 
 func (app App) handleCounter(w http.ResponseWriter, r *http.Request, args []string) {
 	name := args[0]
-	metrics, err := app.store.Read()
+	metrics, _ := app.store.Read()
 	reflected := reflect.ValueOf(metrics)
 	if !reflected.Elem().FieldByName(name).IsValid() {
 		w.WriteHeader(http.StatusNotFound)
 		body := "Status: ERROR\nNot Found"
-		w.Write([]byte(body))
+		_, _ = w.Write([]byte(body))
 		return
 	}
 
@@ -71,14 +70,13 @@ func (app App) handleCounter(w http.ResponseWriter, r *http.Request, args []stri
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		body := fmt.Sprintf("Status: ERROR\nCouldn't parse float from %s", rawValue)
-		w.Write([]byte(body))
+		_, _ = w.Write([]byte(body))
 		return
 	}
 	app.increment <- counter{name, value}
 	w.WriteHeader(http.StatusOK)
 	body := "Status: OK"
-	w.Write([]byte(body))
-	return
+	_, _ = w.Write([]byte(body))
 }
 
 func (app App) WriteMetrics() {
