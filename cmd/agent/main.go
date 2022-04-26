@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"logogger/internal/poller"
 	"logogger/internal/reporter"
 	"time"
@@ -17,7 +16,6 @@ func main() {
 	pollTicker := time.NewTicker(pollInterval)
 	reportTicker := time.NewTicker(reportInterval)
 	channel := make(chan poller.Metrics)
-	responsesChannel := make(chan reporter.ServerResponse)
 
 	go func() {
 		p := poller.Poller(0)
@@ -35,9 +33,7 @@ func main() {
 			case metrics := <-channel:
 				m = metrics
 			case <-reportTicker.C:
-				reporter.ReportMetrics(m, reportHost, responsesChannel)
-			case r := <-responsesChannel:
-				fmt.Println(r)
+				reporter.ReportMetrics(m, reportHost)
 			}
 		}
 	}()

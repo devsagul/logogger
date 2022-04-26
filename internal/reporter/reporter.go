@@ -17,20 +17,20 @@ type ServerResponse struct {
 	dur  time.Duration
 }
 
-func PostRequest(url string, ch chan<- ServerResponse) {
+func PostRequest(url string) {
 	log.Printf("Sending metrics to %s", url)
 	start := time.Now()
 	resp, err := http.Post(url, "text/plain", nil)
 	dur := time.Since(start)
 	if err == nil {
 		log.Printf("Got response after %dms", dur.Milliseconds())
-		ch <- ServerResponse{url, resp, err, dur}
 	} else {
 		log.Printf("Got error after %dms", dur.Milliseconds())
 	}
+	_ = resp.Body.Close()
 }
 
-func ReportMetrics(m poller.Metrics, host string, ch chan<- ServerResponse) {
+func ReportMetrics(m poller.Metrics, host string) {
 	reflected := reflect.ValueOf(m)
 	for i := 0; i < reflected.NumField(); i++ {
 		metricsField := reflected.Type().Field(i).Name
@@ -45,6 +45,6 @@ func ReportMetrics(m poller.Metrics, host string, ch chan<- ServerResponse) {
 			formatString = "http://%s/update/%s/%s/%d"
 			url = fmt.Sprintf(formatString, host, metricsType, metricsField, metricsValue)
 		}
-		go PostRequest(url, ch)
+		go PostRequest(url)
 	}
 }
