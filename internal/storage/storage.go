@@ -1,10 +1,8 @@
 package storage
 
-import (
-	"logogger/internal/poller"
-)
-
 type MetricsStorage interface {
-	Write(metrics poller.Metrics) error
-	Read() (poller.Metrics, error)
+	IncrementCounter(key string, value int64) error
+	GetCounter(key string) (value int64, err error)
+	SetGauge(key string, value float64) error
+	GetGauge(key string) (value float64, err error)
 }
