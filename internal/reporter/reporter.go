@@ -23,7 +23,6 @@ func PostRequest(url string, ch chan<- ServerResponse) {
 	if err == nil {
 		ch <- ServerResponse{url, resp, err, dur}
 	}
-	_ = resp.Body.Close()
 }
 
 func ReportMetrics(m poller.Metrics, host string, ch chan<- ServerResponse) {
