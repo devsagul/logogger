@@ -36,7 +36,7 @@ func (app App) handleGauge(w http.ResponseWriter, r *http.Request, args []string
 	if !reflected.Elem().FieldByName(name).IsValid() {
 		w.WriteHeader(http.StatusNotFound)
 		body := "Status: ERROR\nNot Found"
-		w.Write([]byte(body))
+		_, _ = w.Write([]byte(body))
 		return
 	}
 
@@ -45,13 +45,13 @@ func (app App) handleGauge(w http.ResponseWriter, r *http.Request, args []string
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		body := fmt.Sprintf("Status: ERROR\nCouldn't parse float from %s", rawValue)
-		w.Write([]byte(body))
+		_, _ = w.Write([]byte(body))
 		return
 	}
 	app.set <- gauge{name, value}
 	w.WriteHeader(http.StatusOK)
 	body := "Status: OK"
-	w.Write([]byte(body))
+	_, _ = w.Write([]byte(body))
 	return
 }
 
