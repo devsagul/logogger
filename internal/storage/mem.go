@@ -27,8 +27,12 @@ func (storage *MemStorage) IncrementCounter(key string, value int64) error {
 		storage.counterMutexMapMutex.Unlock()
 	}
 	mu.Lock()
-	prev, _ := storage.counters[key]
-	storage.counters[key] = prev + value
+	prev, found := storage.counters[key]
+	n := value
+	if found {
+		n += prev
+	}
+	storage.counters[key] = n
 	mu.Unlock()
 	return nil
 }

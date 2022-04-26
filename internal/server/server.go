@@ -103,7 +103,7 @@ func NewApp() *App {
 	app := new(App)
 	app.r = new(router.Router)
 	app.store = storage.NewMemStorage()
-	app.r.RegisterHandler(`/update/(?P<Type\w+>)/(?P<Name>\w+)/(?P<Value>[^/]+)$`, app.handleRequest)
+	app.r.RegisterHandler(`/update/(?P<Type>\w+)/(?P<Name>\w+)/(?P<Value>[^/]+)$`, app.handleRequest)
 	return app
 }
 
