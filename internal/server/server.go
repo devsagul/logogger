@@ -29,6 +29,7 @@ type App struct {
 }
 
 func (app App) handleGauge(w http.ResponseWriter, r *http.Request, args []string) {
+	// проверить метод
 	name := args[0]
 	metrics, _ := app.store.Read()
 	reflected := reflect.ValueOf(metrics)

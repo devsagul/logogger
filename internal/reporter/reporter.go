@@ -20,7 +20,9 @@ func PostRequest(url string, ch chan<- ServerResponse) {
 	start := time.Now()
 	resp, err := http.Post(url, "text/plain", nil)
 	dur := time.Since(start)
-	ch <- ServerResponse{url, resp, err, dur}
+	if err == nil {
+		ch <- ServerResponse{url, resp, err, dur}
+	}
 }
 
 func ReportMetrics(m poller.Metrics, host string, ch chan<- ServerResponse) {
