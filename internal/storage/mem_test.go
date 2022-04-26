@@ -10,6 +10,7 @@ func TestMemStorage_GetGaugeAfterSet(t *testing.T) {
 	err := storage.SetGauge("value", 42)
 	assert.Equal(t, nil, err)
 	value, found, err := storage.GetGauge("value")
+	assert.Equal(t, nil, err)
 	assert.Equal(t, true, found)
 	assert.Equal(t, float64(42), value)
 }
@@ -25,6 +26,7 @@ func TestMemStorage_GetCounterAfterSet(t *testing.T) {
 	err := storage.IncrementCounter("value", 42)
 	assert.Equal(t, nil, err)
 	value, found, err := storage.GetCounter("value")
+	assert.Equal(t, nil, err)
 	assert.Equal(t, true, found)
 	assert.Equal(t, int64(42), value)
 }
