@@ -1,97 +1,77 @@
 package storage
 
 import (
+	"fmt"
+	"sort"
 	"sync"
 )
 
 type MemStorage struct {
-	gauges               map[string]float64
-	counters             map[string]int64
-	gaugesMutexMap       map[string]*sync.Mutex
-	gaugeMutexMapMutex   sync.Mutex
-	counterMutexMap      map[string]*sync.Mutex
-	counterMutexMapMutex sync.Mutex
+	m  map[string]MetricDef
+	mu sync.Mutex
 }
 
-func (storage *MemStorage) IncrementCounter(key string, value int64) error {
-	mu, found := storage.counterMutexMap[key]
+func (storage *MemStorage) Increment(key string, value interface{}) error {
+	p, ok := value.(int64)
+	if !ok {
+		return fmt.Errorf("could not increment value %s, increment value %s is not int64", key, value)
+	}
+
+	storage.mu.Lock()
+	defer storage.mu.Unlock()
+	prev, found := storage.m[key]
+	if found && prev.Type != "counter" {
+		return fmt.Errorf("could not increment value %s, currently it's holding value of type %s", key, prev.Type)
+	}
 	if !found {
-		storage.counterMutexMapMutex.Lock()
-		// проверяем, что мьютекс не был создан, пока мы
-		// брали мьютекс на мапу
-		mu, found = storage.counterMutexMap[key]
-		if !found {
-			mu = new(sync.Mutex)
-			storage.counterMutexMap[key] = mu
+		prev = MetricDef{
+			"coutner",
+			key,
+			int64(0),
 		}
-		storage.counterMutexMapMutex.Unlock()
 	}
-	mu.Lock()
-	prev, found := storage.counters[key]
-	n := value
-	if found {
-		n += prev
+
+	v := prev.Value.(int64)
+	storage.m[key] = MetricDef{
+		"counter",
+		key,
+		v + p,
 	}
-	storage.counters[key] = n
-	mu.Unlock()
 	return nil
 }
 
-func (storage *MemStorage) GetCounter(key string) (int64, bool, error) {
-	value, found := storage.counters[key]
+func (storage *MemStorage) Get(key string) (MetricDef, bool, error) {
+	value, found := storage.m[key]
 	if !found {
-		return 0, false, nil
+		return MetricDef{}, false, nil
 	} else {
 		return value, true, nil
 	}
 }
 
-func (storage *MemStorage) SetGauge(key string, value float64) error {
-	mu, found := storage.gaugesMutexMap[key]
-	if !found {
-		storage.gaugeMutexMapMutex.Lock()
-		// проверяем, что мьютекс не был создан, пока мы
-		// брали мьютекс на мапу
-		mu, found = storage.gaugesMutexMap[key]
-		if !found {
-			mu = new(sync.Mutex)
-			storage.gaugesMutexMap[key] = mu
-		}
-		storage.gaugeMutexMapMutex.Unlock()
-	}
-	mu.Lock()
-	storage.gauges[key] = value
-	mu.Unlock()
+func (storage *MemStorage) Put(key string, value MetricDef) error {
+	storage.mu.Lock()
+	defer storage.mu.Unlock()
+	storage.m[key] = value
 	return nil
-}
-
-func (storage *MemStorage) GetGauge(key string) (float64, bool, error) {
-	value, found := storage.gauges[key]
-	if !found {
-		return 0, false, nil
-	} else {
-		return value, true, nil
-	}
 }
 
 func (storage *MemStorage) List() ([]MetricDef, error) {
 	var res []MetricDef
 
-	for key, _ := range storage.counters {
-		res = append(res, MetricDef{"counter", key})
+	for _, value := range storage.m {
+		res = append(res, value)
 	}
-	for key, _ := range storage.gauges {
-		res = append(res, MetricDef{"gauge", key})
-	}
+
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].Name < res[j].Name
+	})
 
 	return res, nil
 }
 
 func NewMemStorage() *MemStorage {
 	m := new(MemStorage)
-	m.counterMutexMap = map[string]*sync.Mutex{}
-	m.gaugesMutexMap = map[string]*sync.Mutex{}
-	m.counters = map[string]int64{}
-	m.gauges = map[string]float64{}
+	m.m = map[string]MetricDef{}
 	return m
 }

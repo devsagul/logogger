@@ -1,14 +1,14 @@
 package storage
 
 type MetricDef struct {
-	Type string
-	Name string
+	Type  string
+	Name  string
+	Value interface{}
 }
 
 type MetricsStorage interface {
-	IncrementCounter(key string, value int64) error
-	GetCounter(key string) (value int64, found bool, err error)
-	SetGauge(key string, value float64) error
-	GetGauge(key string) (value float64, found bool, err error)
+	Increment(key string, value interface{}) error
+	Get(key string) (value MetricDef, found bool, err error)
+	Put(key string, value MetricDef) error
 	List() ([]MetricDef, error)
 }
