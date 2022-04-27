@@ -39,16 +39,25 @@ type Metrics struct {
 	RandomValue   gauge
 }
 
-func Sequence(start int64) func() int64 {
+func Sequence(start int64) (func() int64, chan bool) {
 	i := start
+	reset := make(chan bool)
+
+	go func() {
+		for {
+			<-reset
+			i = start
+		}
+	}()
+
 	return func() int64 {
 		i++
 		return i
-	}
+	}, reset
 }
 
-func Poller(start int64) func() Metrics {
-	c := Sequence(start)
+func Poller(start int64) (func() Metrics, chan bool) {
+	c, reset := Sequence(start)
 
 	return func() Metrics {
 		var memstats runtime.MemStats
@@ -85,5 +94,5 @@ func Poller(start int64) func() Metrics {
 			PollCount:     counter(c()),
 			RandomValue:   gauge(rand.Float64()),
 		}
-	}
+	}, reset
 }

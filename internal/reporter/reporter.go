@@ -2,6 +2,7 @@ package reporter
 
 import (
 	"fmt"
+	"golang.org/x/sync/errgroup"
 	"log"
 	"logogger/internal/poller"
 	"net/http"
@@ -17,7 +18,7 @@ type ServerResponse struct {
 	dur  time.Duration
 }
 
-func PostRequest(url string) {
+func PostRequest(url string) error {
 	log.Printf("Sending metrics to %s", url)
 	start := time.Now()
 	resp, err := http.Post(url, "text/plain", nil)
@@ -28,10 +29,13 @@ func PostRequest(url string) {
 		_ = resp.Body.Close()
 		log.Printf("Got response after %dms", dur.Milliseconds())
 	}
+	return err
 }
 
-func ReportMetrics(m poller.Metrics, host string) {
+func ReportMetrics(m poller.Metrics, host string) error {
 	reflected := reflect.ValueOf(m)
+	eg := &errgroup.Group{}
+
 	for i := 0; i < reflected.NumField(); i++ {
 		metricsField := reflected.Type().Field(i).Name
 		metricsValue := reflected.Field(i).Interface()
@@ -45,6 +49,10 @@ func ReportMetrics(m poller.Metrics, host string) {
 			formatString = "http://%s/update/%s/%s/%d"
 			url = fmt.Sprintf(formatString, host, metricsType, metricsField, metricsValue)
 		}
-		go PostRequest(url)
+
+		eg.Go(func() error {
+			return PostRequest(url)
+		})
 	}
+	return eg.Wait()
 }

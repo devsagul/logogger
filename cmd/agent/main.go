@@ -1,8 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"logogger/internal/poller"
 	"logogger/internal/reporter"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -16,9 +20,9 @@ func main() {
 	pollTicker := time.NewTicker(pollInterval)
 	reportTicker := time.NewTicker(reportInterval)
 	channel := make(chan poller.Metrics)
+	p, reset := poller.Poller(0)
 
 	go func() {
-		p := poller.Poller(0)
 		for {
 			<-pollTicker.C
 			channel <- p()
@@ -26,14 +30,23 @@ func main() {
 	}()
 
 	var m poller.Metrics
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	func() {
-		for {
+		var run = true
+		for run {
 			select {
 			case metrics := <-channel:
 				m = metrics
 			case <-reportTicker.C:
-				reporter.ReportMetrics(m, reportHost)
+				err := reporter.ReportMetrics(m, reportHost)
+				if err == nil {
+					reset <- true
+				}
+			case <-sigs:
+				fmt.Println("Exiting agent...")
+				run = false
 			}
 		}
 	}()
