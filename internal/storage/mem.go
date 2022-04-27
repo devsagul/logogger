@@ -74,6 +74,19 @@ func (storage *MemStorage) GetGauge(key string) (float64, bool, error) {
 	}
 }
 
+func (storage *MemStorage) List() ([]MetricDef, error) {
+	var res []MetricDef
+
+	for key, _ := range storage.counters {
+		res = append(res, MetricDef{"counter", key})
+	}
+	for key, _ := range storage.gauges {
+		res = append(res, MetricDef{"gauge", key})
+	}
+
+	return res, nil
+}
+
 func NewMemStorage() *MemStorage {
 	m := new(MemStorage)
 	m.counterMutexMap = map[string]*sync.Mutex{}
