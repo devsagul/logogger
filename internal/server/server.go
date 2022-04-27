@@ -60,17 +60,15 @@ func (app App) getValue(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte(body))
 			return
 		} else {
-			var f string
-			var v interface{}
+			var body string
 			if valueType == "counter" {
-				v = response.value.Value.(int64)
-				f = "%d"
+				v := response.value.Value.(int64)
+				body = fmt.Sprintf("%d", v)
 			} else {
-				v = response.value.Value.(float64)
-				f = "%f"
+				v := response.value.Value.(float64)
+				body = strconv.FormatFloat(v, 'f', -1, 64)
 			}
 
-			body := fmt.Sprintf(f, v)
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(body))
 			return
