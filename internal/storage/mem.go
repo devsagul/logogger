@@ -12,7 +12,7 @@ type MemStorage struct {
 }
 
 func (storage *MemStorage) Increment(key string, value interface{}) error {
-	p, ok := value.(int64)
+	v, ok := value.(int64)
 	if !ok {
 		return fmt.Errorf("could not increment value %s, increment value %s is not int64", key, value)
 	}
@@ -23,15 +23,12 @@ func (storage *MemStorage) Increment(key string, value interface{}) error {
 	if found && prev.Type != "counter" {
 		return fmt.Errorf("could not increment value %s, currently it's holding value of type %s", key, prev.Type)
 	}
-	if !found {
-		prev = MetricDef{
-			"coutner",
-			key,
-			int64(0),
-		}
+	var p int64 = 0
+
+	if found {
+		p = prev.Value.(int64)
 	}
 
-	v := prev.Value.(int64)
 	storage.m[key] = MetricDef{
 		"counter",
 		key,

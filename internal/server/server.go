@@ -198,8 +198,8 @@ func NewApp() *App {
 	r.Use(middleware.Timeout(60 * time.Second))
 	r.Use(middleware.SetHeader("Content-Type", "text/plain"))
 
-	r.Get("/update/{Type}/{Name}", app.getValue)
 	r.Post("/update/{Type}/{Name}/{Value}", app.updateValue)
+	r.Get("/value/{Type}/{Name}", app.getValue)
 	r.Get("/", app.listMetrics)
 	return app
 }
