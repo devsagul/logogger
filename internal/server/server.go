@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"log"
 	"logogger/internal/storage"
 	"net/http"
 	"strconv"
@@ -27,6 +28,13 @@ type App struct {
 	Router *chi.Mux
 }
 
+func safeWrite(w http.ResponseWriter, body string) {
+	_, err := w.Write([]byte(body))
+	if err != nil {
+		log.Printf("Error: could not write response. Cause: %s", err)
+	}
+}
+
 func (app App) getValue(w http.ResponseWriter, r *http.Request) {
 	valueType := chi.URLParam(r, "Type")
 	name := chi.URLParam(r, "Name")
@@ -36,7 +44,7 @@ func (app App) getValue(w http.ResponseWriter, r *http.Request) {
 	if valueType != "counter" && valueType != "gauge" {
 		w.WriteHeader(http.StatusNotImplemented)
 		body := fmt.Sprintf("Status: ERROR\nUnknown metric type %s", name)
-		_, _ = w.Write([]byte(body))
+		safeWrite(w, body)
 		return
 	}
 
@@ -52,12 +60,12 @@ func (app App) getValue(w http.ResponseWriter, r *http.Request) {
 		if response.err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			body := "Internal Server Error"
-			_, _ = w.Write([]byte(body))
+			safeWrite(w, body)
 			return
 		} else if !response.found {
 			w.WriteHeader(http.StatusNotFound)
 			body := "NotFound"
-			_, _ = w.Write([]byte(body))
+			safeWrite(w, body)
 			return
 		} else {
 			var body string
@@ -70,7 +78,7 @@ func (app App) getValue(w http.ResponseWriter, r *http.Request) {
 			}
 
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(body))
+			safeWrite(w, body)
 			return
 		}
 	case <-ctx.Done():
@@ -88,7 +96,7 @@ func (app App) updateValue(w http.ResponseWriter, r *http.Request) {
 	if valueType != "counter" && valueType != "gauge" {
 		w.WriteHeader(http.StatusNotImplemented)
 		body := fmt.Sprintf("Status: ERROR\nUnknown metric type %s", name)
-		_, _ = w.Write([]byte(body))
+		safeWrite(w, body)
 		return
 	}
 
@@ -103,7 +111,7 @@ func (app App) updateValue(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		body := fmt.Sprintf("Status: ERROR\nCouldn't parse float from %s", rawValue)
-		_, _ = w.Write([]byte(body))
+		safeWrite(w, body)
 		return
 	}
 
@@ -123,12 +131,12 @@ func (app App) updateValue(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			body := "Internal Server Error"
-			_, _ = w.Write([]byte(body))
+			safeWrite(w, body)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
 		body := "Status: OK"
-		_, _ = w.Write([]byte(body))
+		safeWrite(w, body)
 		return
 	case <-ctx.Done():
 		return
@@ -149,7 +157,7 @@ func (app App) listMetrics(w http.ResponseWriter, r *http.Request) {
 		if res.err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			body := "Internal Server Error"
-			_, _ = w.Write([]byte(body))
+			safeWrite(w, body)
 			return
 		} else {
 			w.Header().Set("Content-Type", "text/html")
@@ -175,7 +183,7 @@ func (app App) listMetrics(w http.ResponseWriter, r *http.Request) {
 			sb.Write([]byte(footer))
 
 			body := sb.String()
-			_, _ = w.Write([]byte(body))
+			safeWrite(w, body)
 			return
 		}
 	case <-ctx.Done():

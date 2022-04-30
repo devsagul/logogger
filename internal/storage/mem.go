@@ -53,9 +53,8 @@ func (storage *MemStorage) Get(key string) (MetricDef, bool, error) {
 	value, found := storage.m[key]
 	if !found {
 		return MetricDef{}, false, nil
-	} else {
-		return value, true, nil
 	}
+	return value, true, nil
 }
 
 func (storage *MemStorage) Put(key string, value MetricDef) error {
