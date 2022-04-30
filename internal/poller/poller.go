@@ -39,9 +39,9 @@ type Metrics struct {
 	RandomValue   gauge
 }
 
-func Sequence(start int64) (func() int64, chan bool) {
+func Sequence(start int64) (func() int64, chan struct{}) {
 	i := start
-	reset := make(chan bool)
+	reset := make(chan struct{})
 
 	go func() {
 		for {
@@ -56,7 +56,7 @@ func Sequence(start int64) (func() int64, chan bool) {
 	}, reset
 }
 
-func Poller(start int64) (func() Metrics, chan bool) {
+func Poller(start int64) (func() Metrics, chan struct{}) {
 	c, reset := Sequence(start)
 
 	return func() Metrics {

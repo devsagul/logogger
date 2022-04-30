@@ -42,7 +42,7 @@ func main() {
 			case <-reportTicker.C:
 				err := reporter.ReportMetrics(m, reportHost)
 				if err == nil {
-					reset <- true
+					reset <- struct{}{}
 				}
 			case <-sigs:
 				fmt.Println("Exiting agent...")
