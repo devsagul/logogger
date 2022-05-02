@@ -41,6 +41,7 @@ func TestMemStorage_PutConcurrentSameKey(t *testing.T) {
 
 	eg := &errgroup.Group{}
 	for i := 0; i < concurrency; i++ {
+		i := i
 		eg.Go(func() error {
 			wg.Wait()
 			return storage.Put(schema.NewCounter("counter", int64(i)))
@@ -69,6 +70,7 @@ func TestMemStorage_PutConcurrentDifferentKeys(t *testing.T) {
 
 	eg := &errgroup.Group{}
 	for i := 0; i < concurrency; i++ {
+		i := i
 		eg.Go(func() error {
 			wg.Wait()
 			return storage.Put(schema.NewCounter(fmt.Sprintf("counter_%d", i), int64(i)))
@@ -173,8 +175,8 @@ func TestMemStorage_IncrementConcurrentSameKey(t *testing.T) {
 
 	wg := &sync.WaitGroup{}
 	start := make(chan struct{})
+	wg.Add(1)
 	go func() {
-		wg.Add(1)
 		<-start
 		wg.Done()
 	}()
