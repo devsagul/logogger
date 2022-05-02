@@ -1,6 +1,9 @@
 package schema
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+)
 
 type Metrics struct {
 	ID    string   `json:"id"`
@@ -38,7 +41,7 @@ func (m Metrics) Explain() (string, string, string) {
 		}
 	case "gauge":
 		if m.Value != nil {
-			value = fmt.Sprintf("%f", *m.Value)
+			value = strconv.FormatFloat(*m.Value, 'f', -1, 64)
 		}
 	default:
 		value = ""

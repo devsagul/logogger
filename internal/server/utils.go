@@ -70,6 +70,6 @@ func parseMetric(valueType string, name string, rawValue string) (schema.Metrics
 		}
 		return schema.NewGauge(name, value), nil
 	default:
-		return schema.NewEmptyMetrics(), ValidationError(fmt.Sprintf("Unknown type: %s", valueType))
+		return schema.NewEmptyMetrics(), &requestError{http.StatusNotImplemented, fmt.Sprintf("Could not perform requested operation on type %s", valueType)}
 	}
 }

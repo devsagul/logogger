@@ -7,7 +7,6 @@ import (
 	"logogger/internal/schema"
 	"logogger/internal/storage"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -50,12 +49,7 @@ func (app App) getValue(w http.ResponseWriter, r *http.Request) {
 
 	select {
 	case value := <-read:
-		var body string
-		if valueType == "counter" {
-			body = fmt.Sprintf("%d", *value.Delta)
-		} else {
-			body = strconv.FormatFloat(*value.Value, 'f', -1, 64)
-		}
+		_, _, body := value.Explain()
 		safeWrite(w, http.StatusOK, body)
 		return
 	case err := <-errChan:
