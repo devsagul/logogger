@@ -79,10 +79,12 @@ func (app App) updateValue(w http.ResponseWriter, r *http.Request) {
 			switch err.(type) {
 			case *storage.NotFound:
 				err = app.store.Put(value)
-			case *storage.TypeMismatch:
-				err = app.store.Put(value)
 			}
 		} else {
+			err = app.store.Put(value)
+		}
+		_, ok := err.(*storage.TypeMismatch)
+		if ok {
 			err = app.store.Put(value)
 		}
 		if err != nil {
