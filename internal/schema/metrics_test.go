@@ -6,19 +6,17 @@ import (
 	"testing"
 )
 
-var delta int64 = 42
-var value = 13.37
-
 var serializationTests = []struct {
 	in  Metrics
 	out string
 }{
-	{Metrics{ID: "test", MType: "generic"}, `{"id": "test", "type": "generic"}`},
-	{Metrics{ID: "poll", MType: "counter", Delta: &delta}, `{"id": "poll", "type": "counter", "delta": 42}`},
-	{Metrics{ID: "load", MType: "gauge", Value: &value}, `{"id": "load", "type": "gauge", "value": 13.37}`},
+	{NewCounterRequest("counterID"), `{"id": "counterID", "type": "counter"}`},
+	{NewGaugeRequest("gaugeID"), `{"id": "gaugeID", "type": "gauge"}`},
+	{NewCounter("counterID", 42), `{"id": "counterID", "type": "counter", "delta": 42}`},
+	{NewGauge("gaugeID", 13.37), `{"id": "gaugeID", "type": "gauge", "value": 13.37}`},
 }
 
-func TestMetrics_SerializeRequest(t *testing.T) {
+func TestMetrics_CreateAndSerialize(t *testing.T) {
 	for _, data := range serializationTests {
 		serialized, err := json.Marshal(data.in)
 		assert.Nil(t, err)
