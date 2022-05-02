@@ -11,6 +11,7 @@ func TestMetrics_CreateAndSerialize(t *testing.T) {
 		in  Metrics
 		out string
 	}{
+		{NewEmptyMetrics(), `{"id": "", "type": ""}`},
 		{NewCounterRequest("counterID"), `{"id": "counterID", "type": "counter"}`},
 		{NewGaugeRequest("gaugeID"), `{"id": "gaugeID", "type": "gauge"}`},
 		{NewCounter("counterID", 42), `{"id": "counterID", "type": "counter", "delta": 42}`},

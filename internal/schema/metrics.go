@@ -7,6 +7,10 @@ type Metrics struct {
 	Value *float64 `json:"value,omitempty"`
 }
 
+func NewEmptyMetrics() Metrics {
+	return Metrics{"", "", nil, nil}
+}
+
 func NewCounterRequest(id string) Metrics {
 	return Metrics{ID: id, MType: "counter"}
 }

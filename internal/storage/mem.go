@@ -1,78 +1,93 @@
 package storage
 
 import (
-	"fmt"
+	"logogger/internal/schema"
 	"sort"
 	"sync"
 )
 
 type MemStorage struct {
-	m map[string]MetricDef
+	m map[string]schema.Metrics
 
 	/**
-	здесь похоронена светлая мысль использовать
-	мьютексы на каждый ключ отдельно и один
-	глобальный мьютекс на мапу с мьютексами,
-	но, к сожалению, конкурентная запись в мапу
-	невозможна, даже если я гарантирую отсутсвие
-	конфликтов по ключу. В этот момент неплохо бы
-	использовать канал как примитив синхронизации,
-	но это убьет гарантии на инкремент, поэтому
-	оставляю мьютекс на весь storage
+	Here lies the bright idea of using mutexes
+	for every key separately. Unfortunately,
+	concurrent read-write operations into map
+	are not available (although, it would suit me
+	to lock concurrent write/increment per key only).
+
+	So I use only one mutex for the whole storage.
 	*/
 	mu sync.Mutex
 }
 
-func (storage *MemStorage) Increment(key string, value interface{}) error {
-	v, ok := value.(int64)
-	if !ok {
-		return fmt.Errorf("could not increment value %s, increment value %s is not int64", key, value)
-	}
-
+func (storage *MemStorage) Put(req schema.Metrics) error {
 	storage.mu.Lock()
 	defer storage.mu.Unlock()
-	prev, found := storage.m[key]
-	if found && prev.Type != "counter" {
-		return fmt.Errorf("could not increment value %s, currently it's holding value of type %s", key, prev.Type)
-	}
-	var p int64 = 0
-
-	if found {
-		p = prev.Value.(int64)
+	cur, found := storage.m[req.ID]
+	if found && cur.MType != req.MType {
+		return typeMismatch(req.MType, cur.MType)
 	}
 
-	storage.m[key] = MetricDef{
-		"counter",
-		key,
-		v + p,
-	}
+	storage.m[req.ID] = req
 	return nil
 }
 
-func (storage *MemStorage) Get(key string) (MetricDef, bool, error) {
-	value, found := storage.m[key]
+func (storage *MemStorage) Extract(req schema.Metrics) (schema.Metrics, error) {
+	// Note: this extract should not be re-used in other
+	// methods, this would require a recursive mutex
+	storage.mu.Lock()
+	value, found := storage.m[req.ID]
+	storage.mu.Unlock()
 	if !found {
-		return MetricDef{}, false, nil
+		return req, notFound(req.ID)
 	}
-	return value, true, nil
+	if req.MType != value.MType {
+		return req, typeMismatch(req.MType, value.MType)
+	}
+	return value, nil
 }
 
-func (storage *MemStorage) Put(key string, value MetricDef) error {
+func (storage *MemStorage) Increment(req schema.Metrics, value int64) error {
+	if req.MType != "counter" {
+		return incrementingNonCounterMetrics(req.ID, req.MType)
+	}
+
 	storage.mu.Lock()
 	defer storage.mu.Unlock()
-	storage.m[key] = value
+
+	current, found := storage.m[req.ID]
+
+	if !found {
+		// Note: I do not assume any required behaviour here,
+		// it's up to application to decide, whether this is an
+		// error or the value should be just set as is.
+		return notFound(req.ID)
+	}
+
+	if req.MType != current.MType {
+		// Note: I do not assume any required behaviour here,
+		// it's up to application to decide, whether this is an
+		// error or the value in storage should change its type and
+		// be reset.
+		return typeMismatch(req.MType, current.MType)
+	}
+
+	delta := *current.Delta + value
+	req.Delta = &delta
+	storage.m[req.ID] = req
 	return nil
 }
 
-func (storage *MemStorage) List() ([]MetricDef, error) {
-	var res []MetricDef
+func (storage *MemStorage) List() ([]schema.Metrics, error) {
+	var res []schema.Metrics
 
 	for _, value := range storage.m {
 		res = append(res, value)
 	}
 
 	sort.Slice(res, func(i, j int) bool {
-		return res[i].Name < res[j].Name
+		return res[i].ID < res[j].ID
 	})
 
 	return res, nil
@@ -80,6 +95,6 @@ func (storage *MemStorage) List() ([]MetricDef, error) {
 
 func NewMemStorage() *MemStorage {
 	m := new(MemStorage)
-	m.m = map[string]MetricDef{}
+	m.m = map[string]schema.Metrics{}
 	return m
 }
