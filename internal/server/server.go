@@ -30,7 +30,7 @@ func (app App) getValue(w http.ResponseWriter, r *http.Request) {
 		case "counter":
 			req = schema.NewCounterRequest(name)
 		case "gauge":
-			req = schema.NewCounterRequest(name)
+			req = schema.NewGaugeRequest(name)
 		default:
 			errChan <- &requestError{
 				status: http.StatusNotImplemented,
@@ -81,10 +81,6 @@ func (app App) updateValue(w http.ResponseWriter, r *http.Request) {
 				err = app.store.Put(value)
 			}
 		} else {
-			err = app.store.Put(value)
-		}
-		_, ok := err.(*storage.TypeMismatch)
-		if ok {
 			err = app.store.Put(value)
 		}
 		if err != nil {
