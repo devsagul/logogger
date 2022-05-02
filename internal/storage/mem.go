@@ -26,7 +26,7 @@ func (storage *MemStorage) Put(req schema.Metrics) error {
 	defer storage.mu.Unlock()
 	cur, found := storage.m[req.ID]
 	if found && cur.MType != req.MType {
-		return typeMismatch(req.MType, cur.MType)
+		return typeMismatch(req.ID, req.MType, cur.MType)
 	}
 
 	storage.m[req.ID] = req
@@ -43,7 +43,7 @@ func (storage *MemStorage) Extract(req schema.Metrics) (schema.Metrics, error) {
 		return req, notFound(req.ID)
 	}
 	if req.MType != value.MType {
-		return req, typeMismatch(req.MType, value.MType)
+		return req, typeMismatch(req.ID, req.MType, value.MType)
 	}
 	return value, nil
 }
@@ -70,7 +70,7 @@ func (storage *MemStorage) Increment(req schema.Metrics, value int64) error {
 		// it's up to application to decide, whether this is an
 		// error or the value in storage should change its type and
 		// be reset.
-		return typeMismatch(req.MType, current.MType)
+		return typeMismatch(req.ID, req.MType, current.MType)
 	}
 
 	delta := *current.Delta + value

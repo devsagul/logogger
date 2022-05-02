@@ -1,5 +1,7 @@
 package schema
 
+import "fmt"
+
 type Metrics struct {
 	ID    string   `json:"id"`
 	MType string   `json:"type"`
@@ -25,4 +27,21 @@ func NewCounter(id string, delta int64) Metrics {
 
 func NewGauge(id string, value float64) Metrics {
 	return Metrics{ID: id, MType: "gauge", Value: &value}
+}
+
+func (m Metrics) Explain() (string, string, string) {
+	value := "(nil)"
+	switch m.MType {
+	case "counter":
+		if m.Delta != nil {
+			value = fmt.Sprintf("%d", *m.Delta)
+		}
+	case "gauge":
+		if m.Value != nil {
+			value = fmt.Sprintf("%f", *m.Value)
+		}
+	default:
+		value = ""
+	}
+	return m.ID, m.MType, value
 }

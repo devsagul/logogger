@@ -24,7 +24,7 @@ func TestMemStorage_PutTypeMismatch(t *testing.T) {
 	err := storage.Put(schema.NewGauge("generic", 13.37))
 
 	assert.Errorf(t, err, "Did not return error on mismatched types")
-	assert.IsType(t, TypeMismatch{}, err)
+	assert.IsType(t, &TypeMismatch{}, err)
 }
 
 func TestMemStorage_PutConcurrentSameKey(t *testing.T) {
@@ -92,7 +92,7 @@ func TestMemStorage_ExtractFromEmpty(t *testing.T) {
 	req := schema.NewCounterRequest("counter")
 	_, err := storage.Extract(req)
 	assert.Errorf(t, err, "Did not return error if metrics not found")
-	assert.IsType(t, NotFound{}, err)
+	assert.IsType(t, &NotFound{}, err)
 }
 
 func TestMemStorage_ExtractAfterPut(t *testing.T) {
@@ -116,7 +116,7 @@ func TestMemStorage_ExtractTypeMismatch(t *testing.T) {
 	_, err := storage.Extract(req)
 
 	assert.Errorf(t, err, "Did not return error on stored and requested metrics type mismatch")
-	assert.IsType(t, TypeMismatch{}, err)
+	assert.IsType(t, &TypeMismatch{}, err)
 }
 
 func TestMemStorage_Increment(t *testing.T) {
@@ -140,7 +140,7 @@ func TestMemStorage_IncrementGauge(t *testing.T) {
 	err := storage.Increment(req, 42)
 
 	assert.Errorf(t, err, "Did not return error on attempt to increment gauge")
-	assert.IsType(t, IncrementingNonCounterMetrics{}, err)
+	assert.IsType(t, &IncrementingNonCounterMetrics{}, err)
 }
 
 func TestMemStorage_IncrementEmpty(t *testing.T) {
@@ -157,11 +157,11 @@ func TestMemStorage_IncrementTypeMismatch(t *testing.T) {
 	gauge := schema.NewGauge("counter", 13.37)
 	req := schema.NewCounterRequest("counter")
 
-	storage.Put(gauge)
+	_ = storage.Put(gauge)
 	err := storage.Increment(req, 42)
 
 	assert.Errorf(t, err, "Did not return error on trying to increment stored gauge")
-	assert.IsType(t, TypeMismatch{}, err)
+	assert.IsType(t, &TypeMismatch{}, err)
 }
 
 func TestMemStorage_IncrementConcurrentSameKey(t *testing.T) {
@@ -248,3 +248,5 @@ func TestMemStorage_ListTrivial(t *testing.T) {
 
 	assert.Equal(t, expected, actual)
 }
+
+// test increment actual value not requested

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"log"
+	"logogger/internal/schema"
 	"logogger/internal/storage"
 	"net/http"
 	"strconv"
@@ -12,27 +12,9 @@ import (
 	"time"
 )
 
-type storageResponse struct {
-	value storage.MetricDef
-	found bool
-	err   error
-}
-
-type listResponse struct {
-	list []storage.MetricDef
-	err  error
-}
-
 type App struct {
 	store  storage.MetricsStorage
 	Router *chi.Mux
-}
-
-func safeWrite(w http.ResponseWriter, body string) {
-	_, err := w.Write([]byte(body))
-	if err != nil {
-		log.Printf("Error: could not write response. Cause: %s", err)
-	}
 }
 
 func (app App) getValue(w http.ResponseWriter, r *http.Request) {
@@ -40,47 +22,44 @@ func (app App) getValue(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "Name")
 
 	ctx := r.Context()
-
-	if valueType != "counter" && valueType != "gauge" {
-		w.WriteHeader(http.StatusNotImplemented)
-		body := fmt.Sprintf("Status: ERROR\nUnknown metric type %s", name)
-		safeWrite(w, body)
-		return
-	}
-
-	read := make(chan storageResponse)
+	errChan := make(chan error)
+	read := make(chan schema.Metrics)
 
 	go func() {
-		value, found, err := app.store.Get(name)
-		read <- storageResponse{value, found, err}
+		var req schema.Metrics
+		switch valueType {
+		case "counter":
+			req = schema.NewCounterRequest(name)
+		case "gauge":
+			req = schema.NewCounterRequest(name)
+		default:
+			errChan <- &requestError{
+				status: http.StatusNotImplemented,
+				body:   fmt.Sprintf("Status: ERROR\nCould not perform requested operation on metric type %s", valueType),
+			}
+			return
+		}
+
+		value, err := app.store.Extract(req)
+		if err != nil {
+			errChan <- err
+			return
+		}
+		read <- value
 	}()
 
 	select {
-	case response := <-read:
-		if response.err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			body := "Internal Server Error"
-			safeWrite(w, body)
-			return
-		} else if !response.found {
-			w.WriteHeader(http.StatusNotFound)
-			body := "NotFound"
-			safeWrite(w, body)
-			return
+	case value := <-read:
+		var body string
+		if valueType == "counter" {
+			body = fmt.Sprintf("%d", *value.Delta)
 		} else {
-			var body string
-			if valueType == "counter" {
-				v := response.value.Value.(int64)
-				body = fmt.Sprintf("%d", v)
-			} else {
-				v := response.value.Value.(float64)
-				body = strconv.FormatFloat(v, 'f', -1, 64)
-			}
-
-			w.WriteHeader(http.StatusOK)
-			safeWrite(w, body)
-			return
+			body = strconv.FormatFloat(*value.Value, 'f', -1, 64)
 		}
+		safeWrite(w, http.StatusOK, body)
+		return
+	case err := <-errChan:
+		writeError(w, err)
 	case <-ctx.Done():
 		return
 	}
@@ -92,51 +71,37 @@ func (app App) updateValue(w http.ResponseWriter, r *http.Request) {
 	rawValue := chi.URLParam(r, "Value")
 
 	ctx := r.Context()
+	errChan := make(chan error)
+	done := make(chan struct{})
 
-	if valueType != "counter" && valueType != "gauge" {
-		w.WriteHeader(http.StatusNotImplemented)
-		body := fmt.Sprintf("Status: ERROR\nUnknown metric type %s", name)
-		safeWrite(w, body)
-		return
-	}
-
-	var v interface{}
-	var err error
-	if valueType == "counter" {
-		v, err = strconv.ParseInt(rawValue, 10, 64)
-	} else {
-		v, err = strconv.ParseFloat(rawValue, 64)
-	}
-
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		body := fmt.Sprintf("Status: ERROR\nCouldn't parse float from %s", rawValue)
-		safeWrite(w, body)
-		return
-	}
-
-	write := make(chan error)
 	go func() {
-		var err error
-		if valueType == "counter" {
-			err = app.store.Increment(name, v)
-		} else {
-			err = app.store.Put(name, storage.MetricDef{Type: valueType, Name: name, Value: v})
+		value, err := parseMetric(valueType, name, rawValue)
+		if err != nil {
+			errChan <- err
+			return
 		}
-		write <- err
+		if value.MType == "counter" {
+			err = app.store.Increment(value, *value.Delta)
+			_, ok := err.(*storage.NotFound)
+			if ok {
+				err = app.store.Put(value)
+			}
+		} else {
+			err = app.store.Put(value)
+		}
+		if err != nil {
+			errChan <- err
+			return
+		}
+		done <- struct{}{}
 	}()
 
 	select {
-	case err := <-write:
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			body := "Internal Server Error"
-			safeWrite(w, body)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		body := "Status: OK"
-		safeWrite(w, body)
+	case <-done:
+		safeWrite(w, http.StatusOK, "Status: OK")
+		return
+	case err := <-errChan:
+		writeError(w, err)
 		return
 	case <-ctx.Done():
 		return
@@ -146,46 +111,37 @@ func (app App) updateValue(w http.ResponseWriter, r *http.Request) {
 func (app App) listMetrics(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	ch := make(chan listResponse)
+	read := make(chan []schema.Metrics)
+	errChan := make(chan error)
+
 	go func() {
 		list, err := app.store.List()
-		ch <- listResponse{list, err}
+		if err != nil {
+			errChan <- err
+			return
+		}
+		read <- list
 	}()
 
 	select {
-	case res := <-ch:
-		if res.err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			body := "Internal Server Error"
-			safeWrite(w, body)
-			return
-		} else {
-			w.Header().Set("Content-Type", "text/html")
-			w.WriteHeader(http.StatusOK)
-			var sb strings.Builder
+	case list := <-read:
+		w.Header().Set("Content-Type", "text/html")
+		var sb strings.Builder
 
-			header := "<table><tr><th>Type</th><th>Name</th><th>Value</th></tr>"
-			sb.Write([]byte(header))
-
-			for _, def := range res.list {
-				t := def.Type
-				n := def.Name
-				var s string
-				if t == "counter" {
-					s = fmt.Sprintf("<tr><td>%s</td><td>%s</td><td>%d</td></tr>", t, n, def.Value.(int64))
-				} else {
-					s = fmt.Sprintf("<tr><td>%s</td><td>%s</td><td>%f</td></tr>", t, n, def.Value.(float64))
-				}
-				sb.Write([]byte(s))
-			}
-
-			footer := "</table>"
-			sb.Write([]byte(footer))
-
-			body := sb.String()
-			safeWrite(w, body)
-			return
+		header := "<table><tr><th>Type</th><th>Name</th><th>Value</th></tr>"
+		sb.Write([]byte(header))
+		for _, metrics := range list {
+			name, mType, value := metrics.Explain()
+			row := fmt.Sprintf("<tr><td>%s</td><td>%s</td><td>%s</td></tr>", name, mType, value)
+			sb.Write([]byte(row))
 		}
+		footer := "</table>"
+		sb.Write([]byte(footer))
+		safeWrite(w, http.StatusOK, sb.String())
+		return
+	case err := <-errChan:
+		writeError(w, err)
+		return
 	case <-ctx.Done():
 		return
 	}
@@ -197,7 +153,7 @@ func NewApp() *App {
 	app.Router = r
 	app.store = storage.NewMemStorage()
 
-	// полезные мидлвари
+	// useful middlewares
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
