@@ -76,8 +76,10 @@ func (app App) updateValue(w http.ResponseWriter, r *http.Request) {
 		}
 		if value.MType == "counter" {
 			err = app.store.Increment(value, *value.Delta)
-			_, ok := err.(*storage.NotFound)
-			if ok {
+			switch err.(type) {
+			case *storage.NotFound:
+				err = app.store.Put(value)
+			case *storage.TypeMismatch:
 				err = app.store.Put(value)
 			}
 		} else {

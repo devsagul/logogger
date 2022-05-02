@@ -18,41 +18,22 @@ func safeWrite(w http.ResponseWriter, status int, format string, args ...interfa
 	}
 }
 
-func writeError(w http.ResponseWriter, err error) {
-	if err == nil {
-		return
+func writeError(w http.ResponseWriter, e error) {
+	switch err := e.(type) {
+	case nil:
+	case *requestError:
+		safeWrite(w, err.status, err.body)
+	case *validationError:
+		safeWrite(w, http.StatusBadRequest, err.Error())
+	case *storage.NotFound:
+		safeWrite(w, http.StatusNotFound, "Could not find metrics with name %s", err.ID)
+	case *storage.IncrementingNonCounterMetrics:
+		safeWrite(w, http.StatusNotImplemented, err.ActualType)
+	case *storage.TypeMismatch:
+		safeWrite(w, http.StatusConflict, fmt.Sprintf("Requested operation on metrics %s with type %s, but actual type in storage is %s", err.ID, err.Requested, err.Stored))
+	default:
+		safeWrite(w, http.StatusInternalServerError, "Internal Server Error")
 	}
-
-	reqError, ok := err.(*requestError)
-	if ok {
-		safeWrite(w, reqError.status, reqError.body)
-		return
-	}
-
-	validationError, ok := err.(*validationError)
-	if ok {
-		safeWrite(w, http.StatusBadRequest, validationError.Error())
-	}
-
-	notFound, ok := err.(*storage.NotFound)
-	if ok {
-		safeWrite(w, http.StatusNotFound, "Could not find metrics with name %s", notFound.ID)
-		return
-	}
-
-	incrementNonCounter, ok := err.(*storage.IncrementingNonCounterMetrics)
-	if ok {
-		safeWrite(w, http.StatusNotImplemented, incrementNonCounter.ActualType)
-		return
-	}
-
-	typeMismatch, ok := err.(*storage.TypeMismatch)
-	if ok {
-		safeWrite(w, http.StatusConflict, fmt.Sprintf("Requested operation on metrics %s with type %s, but actual type in storage is %s", typeMismatch.ID, typeMismatch.Requested, typeMismatch.Stored))
-		return
-	}
-
-	safeWrite(w, http.StatusInternalServerError, "Internal Server Error")
 }
 
 func parseMetric(valueType string, name string, rawValue string) (schema.Metrics, error) {
