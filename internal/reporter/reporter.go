@@ -25,10 +25,10 @@ func PostRequest(url string) error {
 	dur := time.Since(start)
 	if err != nil {
 		log.Printf("Got error after %dms", dur.Milliseconds())
-	} else {
-		_ = resp.Body.Close()
-		log.Printf("Got response after %dms", dur.Milliseconds())
+		return err
 	}
+	err = resp.Body.Close()
+	log.Printf("Got response after %dms", dur.Milliseconds())
 	return err
 }
 

@@ -16,7 +16,7 @@ type App struct {
 	Router *chi.Mux
 }
 
-func (app App) getValue(w http.ResponseWriter, r *http.Request) {
+func (app App) RetrieveValue(w http.ResponseWriter, r *http.Request) {
 	valueType := chi.URLParam(r, "Type")
 	name := chi.URLParam(r, "Name")
 
@@ -34,7 +34,7 @@ func (app App) getValue(w http.ResponseWriter, r *http.Request) {
 		default:
 			errChan <- &requestError{
 				status: http.StatusNotImplemented,
-				body:   fmt.Sprintf("Status: ERROR\nCould not perform requested operation on metric type %s", valueType),
+				body:   fmt.Sprintf("Could not perform requested operation on metric type %s", valueType),
 			}
 			return
 		}
@@ -50,16 +50,16 @@ func (app App) getValue(w http.ResponseWriter, r *http.Request) {
 	select {
 	case value := <-read:
 		_, _, body := value.Explain()
-		safeWrite(w, http.StatusOK, body)
+		SafeWrite(w, http.StatusOK, body)
 		return
 	case err := <-errChan:
-		writeError(w, err)
+		WriteError(w, err)
 	case <-ctx.Done():
 		return
 	}
 }
 
-func (app App) updateValue(w http.ResponseWriter, r *http.Request) {
+func (app App) UpdateValue(w http.ResponseWriter, r *http.Request) {
 	valueType := chi.URLParam(r, "Type")
 	name := chi.URLParam(r, "Name")
 	rawValue := chi.URLParam(r, "Value")
@@ -69,19 +69,26 @@ func (app App) updateValue(w http.ResponseWriter, r *http.Request) {
 	done := make(chan struct{})
 
 	go func() {
-		value, err := parseMetric(valueType, name, rawValue)
+		value, err := ParseMetric(valueType, name, rawValue)
 		if err != nil {
 			errChan <- err
 			return
 		}
-		if value.MType == "counter" {
+		switch value.MType {
+		case "counter":
 			err = app.store.Increment(value, *value.Delta)
 			switch err.(type) {
 			case *storage.NotFound:
 				err = app.store.Put(value)
 			}
-		} else {
+		case "gauge":
 			err = app.store.Put(value)
+		default:
+			errChan <- &requestError{
+				status: http.StatusNotImplemented,
+				body:   fmt.Sprintf("Could not perform requested operation on metric type %s", valueType),
+			}
+			return
 		}
 		if err != nil {
 			errChan <- err
@@ -92,17 +99,17 @@ func (app App) updateValue(w http.ResponseWriter, r *http.Request) {
 
 	select {
 	case <-done:
-		safeWrite(w, http.StatusOK, "Status: OK")
+		SafeWrite(w, http.StatusOK, "Status: OK")
 		return
 	case err := <-errChan:
-		writeError(w, err)
+		WriteError(w, err)
 		return
 	case <-ctx.Done():
 		return
 	}
 }
 
-func (app App) listMetrics(w http.ResponseWriter, r *http.Request) {
+func (app App) ListMetrics(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	read := make(chan []schema.Metrics)
@@ -120,6 +127,10 @@ func (app App) listMetrics(w http.ResponseWriter, r *http.Request) {
 	select {
 	case list := <-read:
 		w.Header().Set("Content-Type", "text/html")
+		if len(list) == 0 {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 		var sb strings.Builder
 
 		header := "<table><tr><th>Type</th><th>Name</th><th>Value</th></tr>"
@@ -131,21 +142,21 @@ func (app App) listMetrics(w http.ResponseWriter, r *http.Request) {
 		}
 		footer := "</table>"
 		sb.Write([]byte(footer))
-		safeWrite(w, http.StatusOK, sb.String())
+		SafeWrite(w, http.StatusOK, sb.String())
 		return
 	case err := <-errChan:
-		writeError(w, err)
+		WriteError(w, err)
 		return
 	case <-ctx.Done():
 		return
 	}
 }
 
-func NewApp() *App {
+func NewApp(store storage.MetricsStorage) *App {
 	app := new(App)
 	r := chi.NewRouter()
 	app.Router = r
-	app.store = storage.NewMemStorage()
+	app.store = store
 
 	// useful middlewares
 	r.Use(middleware.RequestID)
@@ -154,8 +165,8 @@ func NewApp() *App {
 	r.Use(middleware.Timeout(60 * time.Second))
 	r.Use(middleware.SetHeader("Content-Type", "text/plain"))
 
-	r.Post("/update/{Type}/{Name}/{Value}", app.updateValue)
-	r.Get("/value/{Type}/{Name}", app.getValue)
-	r.Get("/", app.listMetrics)
+	r.Post("/update/{Type}/{Name}/{Value}", app.UpdateValue)
+	r.Get("/value/{Type}/{Name}", app.RetrieveValue)
+	r.Get("/", app.ListMetrics)
 	return app
 }

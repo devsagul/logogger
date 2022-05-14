@@ -9,7 +9,7 @@ import (
 	"strconv"
 )
 
-func safeWrite(w http.ResponseWriter, status int, format string, args ...interface{}) {
+func SafeWrite(w http.ResponseWriter, status int, format string, args ...interface{}) {
 	w.WriteHeader(status)
 	body := fmt.Sprintf(format, args...)
 	_, err := w.Write([]byte(body))
@@ -18,25 +18,25 @@ func safeWrite(w http.ResponseWriter, status int, format string, args ...interfa
 	}
 }
 
-func writeError(w http.ResponseWriter, e error) {
+func WriteError(w http.ResponseWriter, e error) {
 	switch err := e.(type) {
 	case nil:
 	case *requestError:
-		safeWrite(w, err.status, err.body)
+		SafeWrite(w, err.status, err.body)
 	case *validationError:
-		safeWrite(w, http.StatusBadRequest, err.Error())
+		SafeWrite(w, http.StatusBadRequest, err.Error())
 	case *storage.NotFound:
-		safeWrite(w, http.StatusNotFound, "Could not find metrics with name %s", err.ID)
+		SafeWrite(w, http.StatusNotFound, "Could not find metrics with name %s", err.ID)
 	case *storage.IncrementingNonCounterMetrics:
-		safeWrite(w, http.StatusNotImplemented, err.ActualType)
+		SafeWrite(w, http.StatusNotImplemented, err.ActualType)
 	case *storage.TypeMismatch:
-		safeWrite(w, http.StatusConflict, fmt.Sprintf("Requested operation on metrics %s with type %s, but actual type in storage is %s", err.ID, err.Requested, err.Stored))
+		SafeWrite(w, http.StatusConflict, fmt.Sprintf("Requested operation on metrics %s with type %s, but actual type in storage is %s", err.ID, err.Requested, err.Stored))
 	default:
-		safeWrite(w, http.StatusInternalServerError, "Internal Server Error")
+		SafeWrite(w, http.StatusInternalServerError, "Internal Server Error")
 	}
 }
 
-func parseMetric(valueType string, name string, rawValue string) (schema.Metrics, error) {
+func ParseMetric(valueType string, name string, rawValue string) (schema.Metrics, error) {
 	switch valueType {
 	case "counter":
 		value, err := strconv.ParseInt(rawValue, 10, 64)

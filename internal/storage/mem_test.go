@@ -121,6 +121,15 @@ func TestMemStorage_ExtractTypeMismatch(t *testing.T) {
 	assert.IsType(t, &TypeMismatch{}, err)
 }
 
+func TestMemStorage_ExtractRequestedValueIgnored(t *testing.T) {
+	storage := NewMemStorage()
+	_ = storage.Put(schema.NewCounter("counter", 42))
+
+	actual, _ := storage.Extract(schema.NewCounter("counter", 0))
+
+	assert.Equal(t, int64(42), *actual.Delta)
+}
+
 func TestMemStorage_Increment(t *testing.T) {
 	storage := NewMemStorage()
 	counter := schema.NewCounter("counter", 30)
@@ -232,6 +241,15 @@ func TestMemStorage_IncrementConcurrentDifferentKeys(t *testing.T) {
 	assert.Equal(t, nil, err)
 }
 
+func TestMemStorage_IncrementRequestedValueIgnored(t *testing.T) {
+	storage := NewMemStorage()
+	_ = storage.Put(schema.NewCounter("counter", 42))
+	_ = storage.Increment(schema.NewCounter("counter", 0), 1)
+
+	actual, _ := storage.Extract(schema.NewCounterRequest("counter"))
+	assert.Equal(t, int64(43), *actual.Delta)
+}
+
 func TestMemStorage_ListEmpty(t *testing.T) {
 	storage := NewMemStorage()
 	actual, _ := storage.List()
@@ -250,5 +268,3 @@ func TestMemStorage_ListTrivial(t *testing.T) {
 
 	assert.Equal(t, expected, actual)
 }
-
-// test increment actual value not requested
