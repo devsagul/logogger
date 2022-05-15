@@ -18,7 +18,7 @@ type ServerResponse struct {
 	dur  time.Duration
 }
 
-func PostRequest(url string) error {
+func postRequest(url string) error {
 	log.Printf("Sending metrics to %s", url)
 	start := time.Now()
 	resp, err := http.Post(url, "text/plain", nil)
@@ -29,6 +29,12 @@ func PostRequest(url string) error {
 	}
 	err = resp.Body.Close()
 	log.Printf("Got response after %dms", dur.Milliseconds())
+	if err == nil {
+		code := resp.StatusCode
+		if code >= 400 {
+			return fmt.Errorf("Server returned %d code", code)
+		}
+	}
 	return err
 }
 
@@ -43,15 +49,15 @@ func ReportMetrics(m poller.Metrics, host string) error {
 		var formatString string
 		var url string
 		if metricsType == "gauge" {
-			formatString = "http://%s/update/%s/%s/%f"
+			formatString = "%s/update/%s/%s/%f"
 			url = fmt.Sprintf(formatString, host, metricsType, metricsField, metricsValue)
 		} else {
-			formatString = "http://%s/update/%s/%s/%d"
+			formatString = "%s/update/%s/%s/%d"
 			url = fmt.Sprintf(formatString, host, metricsType, metricsField, metricsValue)
 		}
 
 		eg.Go(func() error {
-			return PostRequest(url)
+			return postRequest(url)
 		})
 	}
 	return eg.Wait()

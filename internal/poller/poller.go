@@ -3,6 +3,7 @@ package poller
 import (
 	"math/rand"
 	"runtime"
+	"sync"
 )
 
 type gauge float64
@@ -39,58 +40,63 @@ type Metrics struct {
 	RandomValue   gauge
 }
 
-func Sequence(start int64) (func() int64, chan struct{}) {
+func sequence(start int64) (func() int64, chan struct{}) {
 	i := start
 	reset := make(chan struct{})
+	mu := sync.Mutex{}
 
 	go func() {
 		for {
 			<-reset
+			mu.Lock()
 			i = start
+			mu.Unlock()
 		}
 	}()
 
 	return func() int64 {
+		mu.Lock()
+		defer mu.Unlock()
 		i++
 		return i
 	}, reset
 }
 
 func Poller(start int64) (func() Metrics, chan struct{}) {
-	c, reset := Sequence(start)
+	c, reset := sequence(start)
 
 	return func() Metrics {
-		var memstats runtime.MemStats
+		var memStats runtime.MemStats
 
-		runtime.ReadMemStats(&memstats)
+		runtime.ReadMemStats(&memStats)
 
 		return Metrics{
-			Alloc:         gauge(memstats.Alloc),
-			BuckHashSys:   gauge(memstats.BuckHashSys),
-			Frees:         gauge(memstats.Frees),
-			GCCPUFraction: gauge(memstats.GCCPUFraction),
-			GCSys:         gauge(memstats.GCSys),
-			HeapAlloc:     gauge(memstats.HeapAlloc),
-			HeapIdle:      gauge(memstats.HeapIdle),
-			HeapInuse:     gauge(memstats.HeapInuse),
-			HeapObjects:   gauge(memstats.HeapObjects),
-			HeapReleased:  gauge(memstats.HeapReleased),
-			HeapSys:       gauge(memstats.HeapSys),
-			LastGC:        gauge(memstats.LastGC),
-			Lookups:       gauge(memstats.Lookups),
-			MCacheInuse:   gauge(memstats.MCacheInuse),
-			MCacheSys:     gauge(memstats.MCacheSys),
-			MSpanInuse:    gauge(memstats.MSpanInuse),
-			Mallocs:       gauge(memstats.Mallocs),
-			NextGC:        gauge(memstats.NextGC),
-			NumForcedGC:   gauge(memstats.NumForcedGC),
-			NumGC:         gauge(memstats.NumGC),
-			OtherSys:      gauge(memstats.OtherSys),
-			PauseTotalNs:  gauge(memstats.PauseTotalNs),
-			StackInuse:    gauge(memstats.StackInuse),
-			StackSys:      gauge(memstats.StackSys),
-			Sys:           gauge(memstats.Sys),
-			TotalAlloc:    gauge(memstats.TotalAlloc),
+			Alloc:         gauge(memStats.Alloc),
+			BuckHashSys:   gauge(memStats.BuckHashSys),
+			Frees:         gauge(memStats.Frees),
+			GCCPUFraction: gauge(memStats.GCCPUFraction),
+			GCSys:         gauge(memStats.GCSys),
+			HeapAlloc:     gauge(memStats.HeapAlloc),
+			HeapIdle:      gauge(memStats.HeapIdle),
+			HeapInuse:     gauge(memStats.HeapInuse),
+			HeapObjects:   gauge(memStats.HeapObjects),
+			HeapReleased:  gauge(memStats.HeapReleased),
+			HeapSys:       gauge(memStats.HeapSys),
+			LastGC:        gauge(memStats.LastGC),
+			Lookups:       gauge(memStats.Lookups),
+			MCacheInuse:   gauge(memStats.MCacheInuse),
+			MCacheSys:     gauge(memStats.MCacheSys),
+			MSpanInuse:    gauge(memStats.MSpanInuse),
+			Mallocs:       gauge(memStats.Mallocs),
+			NextGC:        gauge(memStats.NextGC),
+			NumForcedGC:   gauge(memStats.NumForcedGC),
+			NumGC:         gauge(memStats.NumGC),
+			OtherSys:      gauge(memStats.OtherSys),
+			PauseTotalNs:  gauge(memStats.PauseTotalNs),
+			StackInuse:    gauge(memStats.StackInuse),
+			StackSys:      gauge(memStats.StackSys),
+			Sys:           gauge(memStats.Sys),
+			TotalAlloc:    gauge(memStats.TotalAlloc),
 			PollCount:     counter(c()),
 			RandomValue:   gauge(rand.Float64()),
 		}
