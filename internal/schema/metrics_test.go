@@ -24,4 +24,21 @@ func TestMetrics_CreateAndSerialize(t *testing.T) {
 	}
 }
 
-// test explain
+func TestMetrics_Explain(t *testing.T) {
+
+	params := []struct {
+		m        Metrics
+		expected [3]string
+	}{
+		{NewCounter("cntID", 42), [...]string{"cntID", "counter", "42"}},
+		{NewGauge("ggID", 13.37), [...]string{"ggID", "gauge", "13.37"}},
+		{Metrics{"ID", "type", nil, nil}, [...]string{"ID", "type", "(nil)"}},
+	}
+
+	for _, param := range params {
+		m := param.m
+		id, tp, val := m.Explain()
+		actual := [...]string{id, tp, val}
+		assert.Equal(t, param.expected, actual)
+	}
+}

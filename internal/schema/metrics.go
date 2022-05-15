@@ -44,7 +44,6 @@ func (m Metrics) Explain() (string, string, string) {
 			value = strconv.FormatFloat(*m.Value, 'f', -1, 64)
 		}
 	default:
-		value = ""
 	}
 	return m.ID, m.MType, value
 }
