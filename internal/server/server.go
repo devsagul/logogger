@@ -1,9 +1,12 @@
 package server
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"io"
 	"logogger/internal/schema"
 	"logogger/internal/storage"
 	"net/http"
@@ -152,6 +155,153 @@ func (app App) ListMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (app App) UpdateValueJson(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	errChan := make(chan error)
+	done := make(chan struct{})
+
+	go func() {
+		if r.Body == nil {
+			errChan <- ValidationError("empty body")
+			return
+		}
+
+		data, err := io.ReadAll(r.Body)
+		if err != nil {
+			errChan <- ValidationError(err.Error())
+			return
+		}
+
+		decoder := json.NewDecoder(bytes.NewReader(data))
+		decoder.DisallowUnknownFields()
+
+		var m schema.Metrics
+		err = decoder.Decode(&m)
+
+		invalidData := err != nil ||
+			m.MType == "counter" && m.Delta == nil ||
+			m.MType == "gauge" && m.Value == nil
+
+		if invalidData {
+			var e string
+			if err != nil {
+				e = err.Error()
+			} else {
+				e = "requested value was not specified."
+			}
+			errChan <- ValidationError(e)
+			return
+		}
+
+		switch m.MType {
+		case "counter":
+			err = app.store.Increment(m, *m.Delta)
+			switch err.(type) {
+			case *storage.NotFound:
+				err = app.store.Put(m)
+			}
+		case "gauge":
+			err = app.store.Put(m)
+		default:
+			errChan <- &requestError{
+				status: http.StatusNotImplemented,
+				body:   fmt.Sprintf("Could not perform requested operation on metric type %s", m.MType),
+			}
+			return
+		}
+
+		if err != nil {
+			errChan <- err
+			return
+		}
+
+		done <- struct{}{}
+	}()
+
+	select {
+	case <-done:
+		SafeWrite(w, http.StatusOK, "Status: OK")
+		return
+	case err := <-errChan:
+		WriteError(w, err)
+		return
+	case <-ctx.Done():
+		return
+	}
+}
+
+func (app App) RetrieveValueJson(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	errChan := make(chan error)
+	read := make(chan string)
+
+	go func() {
+		if r.Body == nil {
+			errChan <- ValidationError("empty body")
+			return
+		}
+
+		data, err := io.ReadAll(r.Body)
+		if err != nil {
+			errChan <- ValidationError(err.Error())
+			return
+		}
+
+		decoder := json.NewDecoder(bytes.NewReader(data))
+		decoder.DisallowUnknownFields()
+
+		var m schema.Metrics
+		err = decoder.Decode(&m)
+
+		if err != nil {
+			errChan <- ValidationError(err.Error())
+			return
+		}
+
+		var value schema.Metrics
+
+		switch m.MType {
+		case "counter":
+			value, err = app.store.Extract(m)
+		case "gauge":
+			value, err = app.store.Extract(m)
+		default:
+			errChan <- &requestError{
+				status: http.StatusNotImplemented,
+				body:   fmt.Sprintf("Could not perform requested operation on metric type %s", m.MType),
+			}
+			return
+		}
+
+		if err != nil {
+			errChan <- err
+			return
+		}
+
+		serialized, err := json.Marshal(value)
+
+		if err != nil {
+			errChan <- err
+			return
+		}
+
+		read <- string(serialized)
+	}()
+
+	select {
+	case body := <-read:
+		SafeWrite(w, http.StatusOK, body)
+		return
+	case err := <-errChan:
+		WriteError(w, err)
+		return
+	case <-ctx.Done():
+		return
+	}
+}
+
 func NewApp(store storage.MetricsStorage) *App {
 	app := new(App)
 	r := chi.NewRouter()
@@ -167,6 +317,8 @@ func NewApp(store storage.MetricsStorage) *App {
 
 	r.Post("/update/{Type}/{Name}/{Value}", app.UpdateValue)
 	r.Get("/value/{Type}/{Name}", app.RetrieveValue)
+	r.Post("/update", app.UpdateValueJson)
+	r.Post("/value", app.RetrieveValueJson)
 	r.Get("/", app.ListMetrics)
 	return app
 }

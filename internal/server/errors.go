@@ -16,7 +16,7 @@ type validationError struct {
 }
 
 func (e *validationError) Error() string {
-	return "validation errors: " + strings.Join(e.messages, ";")
+	return "Validation errors: " + strings.Join(e.messages, ";")
 }
 
 func ValidationError(messages ...string) *validationError {
