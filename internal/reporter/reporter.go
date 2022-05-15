@@ -32,7 +32,7 @@ func postRequest(url string) error {
 	if err == nil {
 		code := resp.StatusCode
 		if code >= 400 {
-			return fmt.Errorf("Server returned %d code", code)
+			return fmt.Errorf("server returned %d code", code)
 		}
 	}
 	return err
