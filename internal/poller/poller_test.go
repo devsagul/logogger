@@ -2,23 +2,37 @@ package poller
 
 import (
 	"github.com/stretchr/testify/assert"
+	"logogger/internal/schema"
 	"testing"
 )
 
+func extractCounter(t *testing.T, p Poller) int64 {
+	_, err := p.Poll()
+	if err != nil {
+		assert.FailNow(t, "Error accessing storage.")
+	}
+	value, err := p.store.Extract(schema.NewCounterRequest("PollCount"))
+	if err != nil {
+		assert.FailNow(t, "Error accessing storage.")
+	}
+	return *value.Delta
+}
+
 func TestPoller(t *testing.T) {
-	poller, reset := Poller(0)
+	p, err := NewPoller(0)
+	if err != nil {
+		assert.FailNow(t, "Error accessing storage.")
+	}
 
-	m1 := poller()
-	m2 := poller()
-	reset()
-	m3 := poller()
-	m4 := poller()
-	m5 := poller()
+	c1 := extractCounter(t, p)
+	c2 := extractCounter(t, p)
+	err = p.Reset()
+	if err != nil {
+		assert.FailNow(t, "Error resetting poller.")
+	}
+	c3 := extractCounter(t, p)
 
-	assert.NotEqual(t, nil, m1)
-	assert.Equal(t, counter(1), m1.PollCount)
-	assert.Equal(t, counter(2), m2.PollCount)
-	assert.Equal(t, counter(1), m3.PollCount)
-	assert.Equal(t, counter(2), m4.PollCount)
-	assert.Equal(t, counter(3), m5.PollCount)
+	assert.Equal(t, int64(1), c1)
+	assert.Equal(t, int64(2), c2)
+	assert.Equal(t, int64(1), c3)
 }

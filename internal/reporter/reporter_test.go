@@ -8,25 +8,30 @@ import (
 	"logogger/internal/schema"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
-	"strings"
 	"sync"
 	"testing"
 )
 
 func TestReportMetrics(t *testing.T) {
-	p, _ := poller.Poller(0)
-	m := p()
+	p, err := poller.NewPoller(0)
+	if err != nil {
+		t.Fatalf("Error accessing storage.")
+	}
+
+	l, err := p.Poll()
+	if err != nil {
+		t.Fatalf("Error polling data.")
+	}
 
 	reported := map[string]bool{}
 	rMu := sync.Mutex{}
 
 	// fill the reported set by inspecting Metrics struct
-	reflected := reflect.ValueOf(poller.Metrics{}).Type()
-	for i := 0; i < reflected.NumField(); i++ {
-		metricsField := reflected.Field(i).Name
-		reported[metricsField] = false
+	for _, m := range poller.SysMetrics {
+		reported[m] = false
 	}
+	reported["RandomValue"] = false
+	reported["PollCount"] = false
 
 	handler := http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		url := request.URL.String()
@@ -37,22 +42,19 @@ func TestReportMetrics(t *testing.T) {
 		err := json.NewDecoder(request.Body).Decode(&m)
 
 		assert.Nil(t, err)
+		if err != nil {
+			t.Fatalf("Error decoding metrics.")
+		}
 
 		tField := m.MType
 		name := m.ID
 
 		rMu.Lock()
 		defer rMu.Unlock()
-
 		reportedTwice, ok := reported[name]
 		assert.True(t, ok)
 		assert.False(t, reportedTwice)
 		reported[name] = true
-
-		field, ok := reflected.FieldByName(name)
-		assert.True(t, ok)
-		fieldType := strings.ToLower(field.Type.Name())
-		assert.Equal(t, tField, fieldType)
 
 		switch tField {
 		case "counter":
@@ -66,20 +68,28 @@ func TestReportMetrics(t *testing.T) {
 
 	server := httptest.NewServer(handler)
 	defer server.Close()
-	err := ReportMetrics(m, server.URL)
+	err = ReportMetrics(l, server.URL)
 
-	assert.Nil(t, err)
+	if err != nil {
+		assert.FailNow(t, "Error reporting data.")
+	}
 
-	rMu.Lock()
-	defer rMu.Unlock()
 	for _, value := range reported {
 		assert.True(t, value)
 	}
 }
 
 func TestReportMetrics_FaultyServer(t *testing.T) {
-	p, _ := poller.Poller(0)
-	m := p()
+	p, err := poller.NewPoller(0)
+	if err != nil {
+		assert.FailNow(t, "Error accessing storage.")
+	}
+
+	l, err := p.Poll()
+	if err != nil {
+		assert.FailNow(t, "Error polling data.")
+	}
+
 	handler := http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		url := request.URL
 		fmt.Println(url)
@@ -87,10 +97,10 @@ func TestReportMetrics_FaultyServer(t *testing.T) {
 	})
 	server := httptest.NewServer(handler)
 
-	err := ReportMetrics(m, server.URL)
+	err1 := ReportMetrics(l, server.URL)
 	server.Close()
-	err2 := ReportMetrics(m, server.URL)
+	err2 := ReportMetrics(l, server.URL)
 
-	assert.NotNil(t, err)
+	assert.NotNil(t, err1)
 	assert.NotNil(t, err2)
 }

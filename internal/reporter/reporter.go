@@ -6,11 +6,8 @@ import (
 	"fmt"
 	"golang.org/x/sync/errgroup"
 	"log"
-	"logogger/internal/poller"
 	"logogger/internal/schema"
 	"net/http"
-	"reflect"
-	"strings"
 	"time"
 )
 
@@ -45,34 +42,23 @@ func postRequest(url string, m schema.Metrics) error {
 	log.Printf("Got response after %dms", dur.Milliseconds())
 	if err == nil {
 		code := resp.StatusCode
-		if code >= 400 {
+		if code != 200 {
 			return fmt.Errorf("server returned %d code", code)
 		}
 	}
 	return err
 }
 
-func ReportMetrics(m poller.Metrics, host string) error {
-	reflected := reflect.ValueOf(m)
+func ReportMetrics(l []schema.Metrics, host string) error {
 	eg := &errgroup.Group{}
 
-	for i := 0; i < reflected.NumField(); i++ {
-		metricsField := reflected.Type().Field(i).Name
-		metricsValue := reflected.Field(i).Interface()
-		metricsType := strings.ToLower(reflected.Type().Field(i).Type.Name())
-
+	for _, m := range l {
+		m := m
 		url := fmt.Sprintf("%s/update/", host)
-
-		var m schema.Metrics
-		if metricsType == "gauge" {
-			m = schema.NewGauge(metricsField, float64(metricsValue.(poller.Gauge)))
-		} else {
-			m = schema.NewCounter(metricsField, int64(metricsValue.(poller.Counter)))
-		}
-
 		eg.Go(func() error {
 			return postRequest(url, m)
 		})
 	}
+
 	return eg.Wait()
 }

@@ -1,89 +1,89 @@
 package poller
 
 import (
+	"logogger/internal/schema"
+	"logogger/internal/storage"
 	"math/rand"
+	"reflect"
 	"runtime"
 )
 
-type gauge float64
-type counter int64
-
-type Gauge = gauge
-type Counter = counter
-
-type Metrics struct {
-	Alloc         gauge
-	BuckHashSys   gauge
-	Frees         gauge
-	GCCPUFraction gauge
-	GCSys         gauge
-	HeapAlloc     gauge
-	HeapIdle      gauge
-	HeapInuse     gauge
-	HeapObjects   gauge
-	HeapReleased  gauge
-	HeapSys       gauge
-	LastGC        gauge
-	Lookups       gauge
-	MCacheInuse   gauge
-	MCacheSys     gauge
-	MSpanInuse    gauge
-	MSpanSys      gauge
-	Mallocs       gauge
-	NextGC        gauge
-	NumForcedGC   gauge
-	NumGC         gauge
-	OtherSys      gauge
-	PauseTotalNs  gauge
-	StackInuse    gauge
-	StackSys      gauge
-	Sys           gauge
-	TotalAlloc    gauge
-	PollCount     counter
-	RandomValue   gauge
+var SysMetrics = [...]string{
+	"Alloc",
+	"BuckHashSys",
+	"Frees",
+	"GCCPUFraction",
+	"GCSys",
+	"HeapAlloc",
+	"HeapIdle",
+	"HeapInuse",
+	"HeapObjects",
+	"HeapReleased",
+	"HeapSys",
+	"LastGC",
+	"Lookups",
+	"MCacheInuse",
+	"MCacheSys",
+	"MSpanInuse",
+	"MSpanSys",
+	"Mallocs",
+	"NextGC",
+	"NumForcedGC",
+	"NumGC",
+	"OtherSys",
+	"PauseTotalNs",
+	"StackInuse",
+	"StackSys",
+	"Sys",
+	"TotalAlloc",
 }
 
-func Poller(start int64) (func() Metrics, func()) {
-	cnt := start
+type Poller struct {
+	store storage.MetricsStorage
+	start int64
+}
 
-	return func() Metrics {
-			var memStats runtime.MemStats
+func NewPoller(start int64) (Poller, error) {
+	store := storage.NewMemStorage()
+	err := store.Put(schema.NewCounter("PollCount", start))
+	return Poller{store, start}, err
+}
 
-			runtime.ReadMemStats(&memStats)
+func (p Poller) Poll() ([]schema.Metrics, error) {
+	err := p.store.Increment(schema.NewCounterRequest("PollCount"), 1)
+	if err != nil {
+		return nil, nil
+	}
 
-			cnt += 1
+	r := schema.NewGauge("RandomValue", rand.Float64())
+	err = p.store.Put(r)
+	if err != nil {
+		return nil, nil
+	}
 
-			return Metrics{
-				Alloc:         gauge(memStats.Alloc),
-				BuckHashSys:   gauge(memStats.BuckHashSys),
-				Frees:         gauge(memStats.Frees),
-				GCCPUFraction: gauge(memStats.GCCPUFraction),
-				GCSys:         gauge(memStats.GCSys),
-				HeapAlloc:     gauge(memStats.HeapAlloc),
-				HeapIdle:      gauge(memStats.HeapIdle),
-				HeapInuse:     gauge(memStats.HeapInuse),
-				HeapObjects:   gauge(memStats.HeapObjects),
-				HeapReleased:  gauge(memStats.HeapReleased),
-				HeapSys:       gauge(memStats.HeapSys),
-				LastGC:        gauge(memStats.LastGC),
-				Lookups:       gauge(memStats.Lookups),
-				MCacheInuse:   gauge(memStats.MCacheInuse),
-				MCacheSys:     gauge(memStats.MCacheSys),
-				MSpanInuse:    gauge(memStats.MSpanInuse),
-				Mallocs:       gauge(memStats.Mallocs),
-				NextGC:        gauge(memStats.NextGC),
-				NumForcedGC:   gauge(memStats.NumForcedGC),
-				NumGC:         gauge(memStats.NumGC),
-				OtherSys:      gauge(memStats.OtherSys),
-				PauseTotalNs:  gauge(memStats.PauseTotalNs),
-				StackInuse:    gauge(memStats.StackInuse),
-				StackSys:      gauge(memStats.StackSys),
-				Sys:           gauge(memStats.Sys),
-				TotalAlloc:    gauge(memStats.TotalAlloc),
-				PollCount:     counter(cnt),
-				RandomValue:   gauge(rand.Float64()),
-			}
-		}, func() {
-			cnt = 0
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+
+	reflected := reflect.ValueOf(memStats)
+	for _, stat := range SysMetrics {
+		f := reflected.FieldByName(stat).Interface()
+		v, ok := f.(float64)
+		var g schema.Metrics
+		if ok {
+			g = schema.NewGauge(stat, v)
+		} else {
+			v, _ := f.(int64)
+			g = schema.NewGauge(stat, float64(v))
 		}
+		err := p.store.Put(g)
+		if err != nil {
+			return nil, nil
+		}
+	}
+
+	return p.store.List()
+}
+
+func (p Poller) Reset() error {
+	return p.store.Put(schema.NewCounter("PollCount", p.start))
 }

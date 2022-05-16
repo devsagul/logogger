@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"logogger/internal/poller"
 	"logogger/internal/reporter"
+	"logogger/internal/schema"
 	"os"
 	"os/signal"
 	"syscall"
@@ -19,33 +21,46 @@ const (
 func main() {
 	pollTicker := time.NewTicker(pollInterval)
 	reportTicker := time.NewTicker(reportInterval)
-	channel := make(chan poller.Metrics)
-	p, reset := poller.Poller(0)
+	channel := make(chan []schema.Metrics)
+	p, err := poller.NewPoller(0)
+	if err != nil {
+		log.Println("Could not initialize poller")
+		os.Exit(1)
+	}
 
 	go func() {
 		for {
 			<-pollTicker.C
-			channel <- p()
+			l, err := p.Poll()
+			if err != nil {
+				log.Println("Unable to poll data")
+				time.Sleep(time.Second)
+			} else {
+				channel <- l
+			}
 		}
 	}()
 
-	var m poller.Metrics
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
+	var l []schema.Metrics
 	func() {
 		var run = true
 		for run {
 			select {
 			case metrics := <-channel:
-				m = metrics
+				l = metrics
 			case <-reportTicker.C:
-				err := reporter.ReportMetrics(m, reportHost)
+				err := reporter.ReportMetrics(l, reportHost)
 				if err == nil {
-					reset()
+					err = p.Reset()
+					if err != nil {
+						fmt.Println("Unable to reset PollCount")
+					}
 				}
 			case <-sigs:
-				fmt.Println("Exiting agent...")
+				fmt.Println("Exiting agent gracefully...")
 				run = false
 			}
 		}
