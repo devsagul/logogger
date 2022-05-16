@@ -225,6 +225,11 @@ func (app App) UpdateValueJSON(w http.ResponseWriter, r *http.Request) {
 
 		serialized, err := json.Marshal(value)
 
+		if err != nil {
+			errChan <- err
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		done <- string(serialized)
 	}()
