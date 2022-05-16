@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"logogger/internal/poller"
 	"logogger/internal/reporter"
@@ -59,13 +58,13 @@ func main() {
 				if err == nil {
 					err = p.Reset()
 					if err != nil {
-						fmt.Println("Unable to reset PollCount")
+						log.Println("Unable to reset PollCount")
 					}
 				} else {
-					fmt.Println("Unable to send metrics to server: %s", err.Error())
+					log.Printf("Unable to send metrics to server: %s\n", err.Error())
 				}
 			case <-sigs:
-				fmt.Println("Exiting agent gracefully...")
+				log.Println("Exiting agent gracefully...")
 				run = false
 			}
 		}
