@@ -19,7 +19,7 @@ type ServerResponse struct {
 }
 
 func postRequest(url string, m schema.Metrics) error {
-	log.Printf("Sending metrics to %s", url)
+	log.Printf("Sending %s to %s", m.ID, url)
 	start := time.Now()
 	b, err := json.Marshal(&m)
 	if err != nil {
