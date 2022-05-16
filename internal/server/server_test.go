@@ -321,7 +321,6 @@ func TestApp_RetrieveValueJson(t *testing.T) {
 		assert.Equal(t, param.code, responseCode)
 		assert.Contains(t, respBody, param.needle)
 	}
-	// conflict
 }
 
 func TestApp_RetrieveValueJsonWrongType(t *testing.T) {
