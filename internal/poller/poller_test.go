@@ -10,12 +10,15 @@ func TestPoller(t *testing.T) {
 
 	m1 := poller()
 	m2 := poller()
-	reset <- struct{}{}
+	reset()
 	m3 := poller()
+	m4 := poller()
+	m5 := poller()
 
-	// TODO check that all items are present within the polled data
 	assert.NotEqual(t, nil, m1)
 	assert.Equal(t, counter(1), m1.PollCount)
 	assert.Equal(t, counter(2), m2.PollCount)
 	assert.Equal(t, counter(1), m3.PollCount)
+	assert.Equal(t, counter(2), m4.PollCount)
+	assert.Equal(t, counter(3), m5.PollCount)
 }

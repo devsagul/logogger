@@ -159,7 +159,7 @@ func (app App) UpdateValueJSON(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	errChan := make(chan error)
-	done := make(chan struct{})
+	done := make(chan string)
 
 	go func() {
 		if r.Body == nil {
@@ -216,13 +216,22 @@ func (app App) UpdateValueJSON(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		value, err := app.store.Extract(m)
+
+		if err != nil {
+			errChan <- err
+			return
+		}
+
+		serialized, err := json.Marshal(value)
+
 		w.Header().Set("Content-Type", "application/json")
-		done <- struct{}{}
+		done <- string(serialized)
 	}()
 
 	select {
-	case <-done:
-		SafeWrite(w, http.StatusOK, "Status: OK")
+	case body := <-done:
+		SafeWrite(w, http.StatusOK, body)
 		return
 	case err := <-errChan:
 		WriteError(w, err)
