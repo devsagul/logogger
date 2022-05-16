@@ -58,6 +58,8 @@ func main() {
 					if err != nil {
 						fmt.Println("Unable to reset PollCount")
 					}
+				} else {
+					fmt.Println("Unable to send metrics to server")
 				}
 			case <-sigs:
 				fmt.Println("Exiting agent gracefully...")
