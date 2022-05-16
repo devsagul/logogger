@@ -29,6 +29,7 @@ type Metrics struct {
 	MCacheInuse   gauge
 	MCacheSys     gauge
 	MSpanInuse    gauge
+	MSpanSys      gauge
 	Mallocs       gauge
 	NextGC        gauge
 	NumForcedGC   gauge
