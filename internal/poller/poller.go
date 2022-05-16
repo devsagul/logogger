@@ -2,6 +2,7 @@ package poller
 
 import (
 	"fmt"
+	"golang.org/x/sync/errgroup"
 	"logogger/internal/schema"
 	"logogger/internal/storage"
 	"math/rand"
@@ -67,20 +68,30 @@ func (p Poller) Poll() ([]schema.Metrics, error) {
 	runtime.ReadMemStats(&memStats)
 
 	reflected := reflect.ValueOf(memStats)
+
+	eg := &errgroup.Group{}
 	for _, stat := range SysMetrics {
-		v := reflected.FieldByName(stat).Interface()
-		f, err := strconv.ParseFloat(fmt.Sprintf("%v", v), 64)
-		if err != nil {
-			return nil, nil
-		}
-		var g schema.Metrics
-		g = schema.NewGauge(stat, f)
-		err = p.store.Put(g)
-		if err != nil {
-			return nil, nil
-		}
+		stat := stat
+		eg.Go(func() error {
+			v := reflected.FieldByName(stat).Interface()
+			f, err := strconv.ParseFloat(fmt.Sprintf("%v", v), 64)
+			if err != nil {
+				return err
+			}
+			var g schema.Metrics
+			g = schema.NewGauge(stat, f)
+			err = p.store.Put(g)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
 	}
 
+	err = eg.Wait()
+	if err != nil {
+		return nil, err
+	}
 	return p.store.List()
 }
 
