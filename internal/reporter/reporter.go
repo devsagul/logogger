@@ -20,7 +20,7 @@ type ServerResponse struct {
 }
 
 func postRequest(url string, m schema.Metrics) error {
-	id, err := uuid.NewUUID()
+	id, err := uuid.NewRandom()
 	if err != nil {
 		return err
 	}
