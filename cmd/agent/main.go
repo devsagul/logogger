@@ -55,13 +55,14 @@ func main() {
 				l = metrics
 			case <-reportTicker.C:
 				err := reporter.ReportMetrics(l, reportHost)
+				os.Exit(0)
 				if err == nil {
 					err = p.Reset()
 					if err != nil {
 						fmt.Println("Unable to reset PollCount")
 					}
 				} else {
-					fmt.Println("Unable to send metrics to server")
+					fmt.Println("Unable to send metrics to server: %s", err.Error())
 				}
 			case <-sigs:
 				fmt.Println("Exiting agent gracefully...")

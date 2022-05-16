@@ -40,7 +40,7 @@ func postRequest(url string, m schema.Metrics) error {
 	dur := time.Since(start)
 	resp, err := client.Do(request)
 	if err != nil {
-		log.Printf("%s Got error after %dms", id, dur.Milliseconds())
+		log.Printf("%s Got error after %dms: %s", id, dur.Milliseconds(), err.Error())
 		return err
 	}
 	err = resp.Body.Close()
