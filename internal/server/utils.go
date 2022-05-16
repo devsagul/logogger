@@ -11,8 +11,7 @@ import (
 
 func SafeWrite(w http.ResponseWriter, status int, format string, args ...interface{}) {
 	w.WriteHeader(status)
-	var body string
-	body = fmt.Sprintf(format, args...)
+	body := fmt.Sprintf(format, args...)
 	_, err := w.Write([]byte(body))
 	if err != nil {
 		log.Printf("Error: could not write response. Cause: %s", err)

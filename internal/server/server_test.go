@@ -229,7 +229,7 @@ func TestApp_UpdateValueJson(t *testing.T) {
 	}
 }
 
-func TestApp_UpdateValueJson_WrongType(t *testing.T) {
+func TestApp_UpdateValueJSON_WrongType(t *testing.T) {
 	store := storage.NewMemStorage()
 	app := NewApp(store)
 	d := int64(42)
@@ -251,7 +251,7 @@ func TestApp_UpdateValueJson_WrongType(t *testing.T) {
 	assert.Contains(t, respBody, "Could not perform requested operation")
 }
 
-func TestApp_RetrieveValueJsonNoInput(t *testing.T) {
+func TestApp_RetrieveValueJSONNoInput(t *testing.T) {
 	store := storage.NewMemStorage()
 	app := NewApp(store)
 
@@ -266,7 +266,7 @@ func TestApp_RetrieveValueJsonNoInput(t *testing.T) {
 	assert.Contains(t, body, "Validation errors")
 }
 
-func TestApp_RetrieveValueJsonInvalidInput(t *testing.T) {
+func TestApp_RetrieveValueJSONInvalidInput(t *testing.T) {
 	store := storage.NewMemStorage()
 	app := NewApp(store)
 
@@ -290,7 +290,7 @@ func TestApp_RetrieveValueJsonInvalidInput(t *testing.T) {
 	}
 }
 
-func TestApp_RetrieveValueJson(t *testing.T) {
+func TestApp_RetrieveValueJSON(t *testing.T) {
 	store := storage.NewMemStorage()
 	app := NewApp(store)
 
@@ -323,7 +323,7 @@ func TestApp_RetrieveValueJson(t *testing.T) {
 	}
 }
 
-func TestApp_RetrieveValueJsonWrongType(t *testing.T) {
+func TestApp_RetrieveValueJSONWrongType(t *testing.T) {
 	store := storage.NewMemStorage()
 	app := NewApp(store)
 	m := schema.Metrics{
