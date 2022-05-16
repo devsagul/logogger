@@ -1,11 +1,13 @@
 package poller
 
 import (
+	"fmt"
 	"logogger/internal/schema"
 	"logogger/internal/storage"
 	"math/rand"
 	"reflect"
 	"runtime"
+	"strconv"
 )
 
 var SysMetrics = [...]string{
@@ -66,16 +68,14 @@ func (p Poller) Poll() ([]schema.Metrics, error) {
 
 	reflected := reflect.ValueOf(memStats)
 	for _, stat := range SysMetrics {
-		f := reflected.FieldByName(stat).Interface()
-		v, ok := f.(float64)
-		var g schema.Metrics
-		if ok {
-			g = schema.NewGauge(stat, v)
-		} else {
-			v, _ := f.(int64)
-			g = schema.NewGauge(stat, float64(v))
+		v := reflected.FieldByName(stat).Interface()
+		f, err := strconv.ParseFloat(fmt.Sprintf("%v", v), 64)
+		if err != nil {
+			return nil, nil
 		}
-		err := p.store.Put(g)
+		var g schema.Metrics
+		g = schema.NewGauge(stat, f)
+		err = p.store.Put(g)
 		if err != nil {
 			return nil, nil
 		}
