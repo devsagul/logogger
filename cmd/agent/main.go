@@ -54,7 +54,6 @@ func main() {
 				l = metrics
 			case <-reportTicker.C:
 				err := reporter.ReportMetrics(l, reportHost)
-				os.Exit(0)
 				if err == nil {
 					err = p.Reset()
 					if err != nil {

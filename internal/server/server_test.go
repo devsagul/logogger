@@ -197,11 +197,11 @@ func TestApp_UpdateValueJson(t *testing.T) {
 		},
 		{
 			schema.NewGauge("ggID", 13.37),
-			schema.NewGauge("cntID", 13.37),
+			schema.NewGauge("ggID", 13.37),
 		},
 		{
 			schema.NewGauge("ggID", 42),
-			schema.NewGauge("cntID", 42),
+			schema.NewGauge("ggID", 42),
 		},
 	}
 
@@ -215,17 +215,20 @@ func TestApp_UpdateValueJson(t *testing.T) {
 		responseCode := recorder.Code
 
 		expected := param.expected
-		stored, _ := store.Extract(expected)
+
+		var actual schema.Metrics
+		decoder := json.NewDecoder(recorder.Body)
+		_ = decoder.Decode(&actual)
 		contentType := recorder.Header().Get("Content-Type")
 
 		assert.Equal(t, http.StatusOK, responseCode)
-		assert.Equal(t, expected.ID, stored.ID)
-		assert.Equal(t, expected.MType, stored.MType)
+		assert.Equal(t, expected.ID, actual.ID)
+		assert.Equal(t, expected.MType, actual.MType)
 		switch expected.MType {
 		case "counter":
-			assert.Equal(t, *expected.Delta, *stored.Delta)
+			assert.Equal(t, *expected.Delta, *actual.Delta)
 		case "gauge":
-			assert.Equal(t, *expected.Value, *stored.Value)
+			assert.Equal(t, *expected.Value, *actual.Value)
 		}
 		assert.Equal(t, "application/json", contentType)
 	}
