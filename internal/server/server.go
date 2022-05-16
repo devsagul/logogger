@@ -102,13 +102,12 @@ func (app App) updateValue(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (app App) listMetrics(w http.ResponseWriter, r *http.Request) error {
+func (app App) listMetrics(w http.ResponseWriter, _ *http.Request) error {
 	list, err := app.store.List()
 	if err != nil {
 		return err
 	}
 
-	w.Header().Set("Content-Type", "text/html")
 	if len(list) == 0 {
 		w.WriteHeader(http.StatusOK)
 		return nil
@@ -181,7 +180,6 @@ func (app App) updateValueJSON(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	SafeWrite(w, http.StatusOK, string(serialized))
 	return nil
 }
@@ -226,7 +224,6 @@ func (app App) retrieveValueJSON(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	SafeWrite(w, http.StatusOK, string(serialized))
 	return nil
 }
@@ -242,12 +239,11 @@ func NewApp(store storage.MetricsStorage) *App {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(60 * time.Second))
-	r.Use(middleware.SetHeader("Content-Type", "text/plain"))
 
-	r.Post("/update/{Type}/{Name}/{Value}", newHandler(app.updateValue))
-	r.Get("/value/{Type}/{Name}", newHandler(app.retrieveValue))
-	r.Post("/update/", newHandler(app.updateValueJSON))
-	r.Post("/value/", newHandler(app.retrieveValueJSON))
-	r.Get("/", newHandler(app.listMetrics))
+	r.With(middleware.SetHeader("Content-Type", "text/plain")).Post("/update/{Type}/{Name}/{Value}", newHandler(app.updateValue))
+	r.With(middleware.SetHeader("Content-Type", "text/plain")).Get("/value/{Type}/{Name}", newHandler(app.retrieveValue))
+	r.With(middleware.SetHeader("Content-Type", "application/json")).Post("/update/", newHandler(app.updateValueJSON))
+	r.With(middleware.SetHeader("Content-Type", "application/json")).Post("/value/", newHandler(app.retrieveValueJSON))
+	r.With(middleware.SetHeader("Content-Type", "text/html")).Get("/", newHandler(app.listMetrics))
 	return app
 }

@@ -19,21 +19,33 @@ func SafeWrite(w http.ResponseWriter, status int, format string, args ...interfa
 }
 
 func WriteError(w http.ResponseWriter, e error) {
+	var status int
+	var error string
 	switch err := e.(type) {
 	case nil:
 	case *requestError:
-		SafeWrite(w, err.status, err.body)
+		status = err.status
+		error = err.body
 	case *validationError:
-		SafeWrite(w, http.StatusBadRequest, err.Error())
+		status = http.StatusBadRequest
+		error = err.Error()
 	case *storage.NotFound:
-		SafeWrite(w, http.StatusNotFound, "Could not find metrics with name %s", err.ID)
+		status = http.StatusNotFound
+		error = fmt.Sprintf("Could not find metrics with name %s", err.ID)
 	case *storage.IncrementingNonCounterMetrics:
-		SafeWrite(w, http.StatusNotImplemented, err.ActualType)
+		status = http.StatusNotImplemented
+		error = fmt.Sprintf("Could not increment metrics of type %s", err.ActualType)
 	case *storage.TypeMismatch:
-		SafeWrite(w, http.StatusConflict, fmt.Sprintf("Requested operation on metrics %s with type %s, but actual type in storage is %s", err.ID, err.Requested, err.Stored))
+		status = http.StatusConflict
+		error = fmt.Sprintf("Requested operation on metrics %s with type %s, but actual type in storage is %s", err.ID, err.Requested, err.Stored)
 	default:
-		SafeWrite(w, http.StatusInternalServerError, "Internal Server Error")
+		status = http.StatusInternalServerError
+		error = "Internal Server Error"
 	}
+	if w.Header().Get("Content-Type") == "application/json" {
+		error = fmt.Sprintf(`{error: "%s"}`, error)
+	}
+	SafeWrite(w, status, error)
 }
 
 func ParseMetric(valueType string, name string, rawValue string) (schema.Metrics, error) {

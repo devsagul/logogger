@@ -375,7 +375,7 @@ func TestApp_FaultyStorage(t *testing.T) {
 		body := recorder.Body.String()
 
 		assert.Equal(t, http.StatusInternalServerError, responseCode)
-		assert.Equal(t, "Internal Server Error", body)
+		assert.Contains(t, body, "Internal Server Error")
 	}
 }
 
