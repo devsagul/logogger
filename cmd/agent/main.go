@@ -19,6 +19,8 @@ const (
 )
 
 func main() {
+	time.Sleep(time.Second)
+
 	pollTicker := time.NewTicker(pollInterval)
 	reportTicker := time.NewTicker(reportInterval)
 	channel := make(chan []schema.Metrics)
