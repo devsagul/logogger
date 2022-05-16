@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 	"log"
 	"logogger/internal/schema"
@@ -19,7 +20,11 @@ type ServerResponse struct {
 }
 
 func postRequest(url string, m schema.Metrics) error {
-	log.Printf("Sending %s to %s", m.ID, url)
+	id, err := uuid.NewUUID()
+	if err != nil {
+		return err
+	}
+	log.Printf("%s, Sending %s to %s", id, m.ID, url)
 	start := time.Now()
 	b, err := json.Marshal(&m)
 	if err != nil {
@@ -35,7 +40,7 @@ func postRequest(url string, m schema.Metrics) error {
 	dur := time.Since(start)
 	resp, err := client.Do(request)
 	if err != nil {
-		log.Printf("Got error after %dms", dur.Milliseconds())
+		log.Printf("%s Got error after %dms", id, dur.Milliseconds())
 		return err
 	}
 	err = resp.Body.Close()
@@ -43,7 +48,7 @@ func postRequest(url string, m schema.Metrics) error {
 	if err == nil {
 		code := resp.StatusCode
 		if code != 200 {
-			return fmt.Errorf("server returned %d code", code)
+			return fmt.Errorf("%s server returned %d code", id, code)
 		}
 	}
 	return err
