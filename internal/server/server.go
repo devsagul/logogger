@@ -19,9 +19,9 @@ type App struct {
 	Router *chi.Mux
 }
 
-type errorHttpHandler func(http.ResponseWriter, *http.Request) error
+type errorHTTPHandler func(http.ResponseWriter, *http.Request) error
 
-func newHandler(handler errorHttpHandler) http.HandlerFunc {
+func newHandler(handler errorHTTPHandler) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		errChan := make(chan error)
 		ctx := request.Context()
