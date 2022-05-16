@@ -78,9 +78,7 @@ func (p Poller) Poll() ([]schema.Metrics, error) {
 			if err != nil {
 				return err
 			}
-			var g schema.Metrics
-			g = schema.NewGauge(stat, f)
-			err = p.store.Put(g)
+			err = p.store.Put(schema.NewGauge(stat, f))
 			if err != nil {
 				return err
 			}
