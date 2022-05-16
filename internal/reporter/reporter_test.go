@@ -1,14 +1,14 @@
 package reporter
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"logogger/internal/poller"
+	"logogger/internal/schema"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
-	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -17,7 +17,6 @@ import (
 func TestReportMetrics(t *testing.T) {
 	p, _ := poller.Poller(0)
 	m := p()
-	re := regexp.MustCompile(`/update/([^/]+)/([^/]+)/([^/]+)$`)
 
 	reported := map[string]bool{}
 	rMu := sync.Mutex{}
@@ -31,14 +30,16 @@ func TestReportMetrics(t *testing.T) {
 
 	handler := http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		url := request.URL.String()
-		match := re.FindStringSubmatch(url)
-		assert.NotEmpty(t, match)
 
-		fmt.Println(match)
+		assert.Equal(t, "/update", url)
 
-		tField := match[1]
-		name := match[2]
-		val := match[3]
+		var m schema.Metrics
+		err := json.NewDecoder(request.Body).Decode(&m)
+
+		assert.Nil(t, err)
+
+		tField := m.MType
+		name := m.ID
 
 		rMu.Lock()
 		defer rMu.Unlock()
@@ -55,11 +56,9 @@ func TestReportMetrics(t *testing.T) {
 
 		switch tField {
 		case "counter":
-			_, err := strconv.ParseInt(val, 10, 64)
-			assert.Nil(t, err)
+			assert.NotNil(t, m.Delta)
 		case "gauge":
-			_, err := strconv.ParseFloat(val, 64)
-			assert.Nil(t, err)
+			assert.NotNil(t, m.Value)
 		default:
 			t.Fatalf("Unknown metrics type %s", tField)
 		}

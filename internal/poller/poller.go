@@ -9,6 +9,9 @@ import (
 type gauge float64
 type counter int64
 
+type Gauge = gauge
+type Counter = counter
+
 type Metrics struct {
 	Alloc         gauge
 	BuckHashSys   gauge

@@ -1,10 +1,13 @@
 package reporter
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"golang.org/x/sync/errgroup"
 	"log"
 	"logogger/internal/poller"
+	"logogger/internal/schema"
 	"net/http"
 	"reflect"
 	"strings"
@@ -18,11 +21,22 @@ type ServerResponse struct {
 	dur  time.Duration
 }
 
-func postRequest(url string) error {
+func postRequest(url string, m schema.Metrics) error {
 	log.Printf("Sending metrics to %s", url)
 	start := time.Now()
-	resp, err := http.Post(url, "text/plain", nil)
+	b, err := json.Marshal(&m)
+	if err != nil {
+		return err
+	}
+	request, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Content-Type", "application/json; charset=UTF-8")
+
+	client := &http.Client{}
 	dur := time.Since(start)
+	resp, err := client.Do(request)
 	if err != nil {
 		log.Printf("Got error after %dms", dur.Milliseconds())
 		return err
@@ -46,18 +60,18 @@ func ReportMetrics(m poller.Metrics, host string) error {
 		metricsField := reflected.Type().Field(i).Name
 		metricsValue := reflected.Field(i).Interface()
 		metricsType := strings.ToLower(reflected.Type().Field(i).Type.Name())
-		var formatString string
-		var url string
+
+		url := fmt.Sprintf("%s/update", host)
+
+		var m schema.Metrics
 		if metricsType == "gauge" {
-			formatString = "%s/update/%s/%s/%f"
-			url = fmt.Sprintf(formatString, host, metricsType, metricsField, metricsValue)
+			m = schema.NewGauge(metricsField, float64(metricsValue.(poller.Gauge)))
 		} else {
-			formatString = "%s/update/%s/%s/%d"
-			url = fmt.Sprintf(formatString, host, metricsType, metricsField, metricsValue)
+			m = schema.NewCounter(metricsField, int64(metricsValue.(poller.Counter)))
 		}
 
 		eg.Go(func() error {
-			return postRequest(url)
+			return postRequest(url, m)
 		})
 	}
 	return eg.Wait()
