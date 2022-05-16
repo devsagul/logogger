@@ -216,6 +216,7 @@ func TestApp_UpdateValueJson(t *testing.T) {
 
 		expected := param.expected
 		stored, _ := store.Extract(expected)
+		contentType := recorder.Header().Get("Content-Type")
 
 		assert.Equal(t, http.StatusOK, responseCode)
 		assert.Equal(t, expected.ID, stored.ID)
@@ -226,6 +227,7 @@ func TestApp_UpdateValueJson(t *testing.T) {
 		case "gauge":
 			assert.Equal(t, *expected.Value, *stored.Value)
 		}
+		assert.Equal(t, "application/json", contentType)
 	}
 }
 

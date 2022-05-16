@@ -216,6 +216,7 @@ func (app App) UpdateValueJSON(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		w.Header().Set("Content-Type", "application/json")
 		done <- struct{}{}
 	}()
 
@@ -287,6 +288,7 @@ func (app App) RetrieveValueJSON(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		w.Header().Set("Content-Type", "application/json")
 		read <- string(serialized)
 	}()
 
