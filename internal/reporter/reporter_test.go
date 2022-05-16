@@ -31,7 +31,7 @@ func TestReportMetrics(t *testing.T) {
 	handler := http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		url := request.URL.String()
 
-		assert.Equal(t, "/update", url)
+		assert.Equal(t, "/update/", url)
 
 		var m schema.Metrics
 		err := json.NewDecoder(request.Body).Decode(&m)

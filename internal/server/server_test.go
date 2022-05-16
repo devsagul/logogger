@@ -141,7 +141,7 @@ func TestApp_UpdateValueJsonNoInput(t *testing.T) {
 	store := storage.NewMemStorage()
 	app := NewApp(store)
 
-	req, _ := http.NewRequest(http.MethodPost, "/update", nil)
+	req, _ := http.NewRequest(http.MethodPost, "/update/", nil)
 	recorder := httptest.NewRecorder()
 	app.Router.ServeHTTP(recorder, req)
 
@@ -167,7 +167,7 @@ func TestApp_UpdateValueJsonInvalidInput(t *testing.T) {
 
 	for _, data := range tests {
 		body := bytes.NewBufferString(data)
-		req, _ := http.NewRequest(http.MethodPost, "/update", body)
+		req, _ := http.NewRequest(http.MethodPost, "/update/", body)
 		recorder := httptest.NewRecorder()
 		app.Router.ServeHTTP(recorder, req)
 
@@ -208,7 +208,7 @@ func TestApp_UpdateValueJson(t *testing.T) {
 	for _, param := range params {
 		serialized, _ := json.Marshal(param.data)
 		body := bytes.NewBuffer(serialized)
-		req, _ := http.NewRequest(http.MethodPost, "/update", body)
+		req, _ := http.NewRequest(http.MethodPost, "/update/", body)
 		recorder := httptest.NewRecorder()
 		app.Router.ServeHTTP(recorder, req)
 
@@ -240,7 +240,7 @@ func TestApp_UpdateValueJSON_WrongType(t *testing.T) {
 
 	serialized, _ := json.Marshal(m)
 	body := bytes.NewBuffer(serialized)
-	req, _ := http.NewRequest(http.MethodPost, "/update", body)
+	req, _ := http.NewRequest(http.MethodPost, "/update/", body)
 	recorder := httptest.NewRecorder()
 	app.Router.ServeHTTP(recorder, req)
 
@@ -255,7 +255,7 @@ func TestApp_RetrieveValueJSONNoInput(t *testing.T) {
 	store := storage.NewMemStorage()
 	app := NewApp(store)
 
-	req, _ := http.NewRequest(http.MethodPost, "/value", nil)
+	req, _ := http.NewRequest(http.MethodPost, "/value/", nil)
 	recorder := httptest.NewRecorder()
 	app.Router.ServeHTTP(recorder, req)
 
@@ -278,7 +278,7 @@ func TestApp_RetrieveValueJSONInvalidInput(t *testing.T) {
 
 	for _, data := range tests {
 		body := bytes.NewBufferString(data)
-		req, _ := http.NewRequest(http.MethodPost, "/value", body)
+		req, _ := http.NewRequest(http.MethodPost, "/value/", body)
 		recorder := httptest.NewRecorder()
 		app.Router.ServeHTTP(recorder, req)
 
@@ -311,7 +311,7 @@ func TestApp_RetrieveValueJSON(t *testing.T) {
 	for _, param := range params {
 		serialized, _ := json.Marshal(param.request)
 		body := bytes.NewBuffer(serialized)
-		req, _ := http.NewRequest(http.MethodPost, "/value", body)
+		req, _ := http.NewRequest(http.MethodPost, "/value/", body)
 		recorder := httptest.NewRecorder()
 		app.Router.ServeHTTP(recorder, req)
 
@@ -332,7 +332,7 @@ func TestApp_RetrieveValueJSONWrongType(t *testing.T) {
 
 	serialized, _ := json.Marshal(m)
 	body := bytes.NewBuffer(serialized)
-	req, _ := http.NewRequest(http.MethodPost, "/value", body)
+	req, _ := http.NewRequest(http.MethodPost, "/value/", body)
 	recorder := httptest.NewRecorder()
 	app.Router.ServeHTTP(recorder, req)
 
@@ -353,8 +353,8 @@ func TestApp_FaultyStorage(t *testing.T) {
 		body   string
 	}{
 		{"/", http.MethodGet, ""},
-		{"/update", http.MethodPost, `{"id": "cntID", "type": "counter", "delta": 42}`},
-		{"/value", http.MethodPost, `{"id": "cntID", "type": "counter"}`},
+		{"/update/", http.MethodPost, `{"id": "cntID", "type": "counter", "delta": 42}`},
+		{"/value/", http.MethodPost, `{"id": "cntID", "type": "counter"}`},
 		{"/update/counter/cntId/1", http.MethodPost, ""},
 		{"/value/counter/cntId", http.MethodGet, ""},
 	}

@@ -317,8 +317,8 @@ func NewApp(store storage.MetricsStorage) *App {
 
 	r.Post("/update/{Type}/{Name}/{Value}", app.UpdateValue)
 	r.Get("/value/{Type}/{Name}", app.RetrieveValue)
-	r.Post("/update", app.UpdateValueJSON)
-	r.Post("/value", app.RetrieveValueJSON)
+	r.Post("/update/", app.UpdateValueJSON)
+	r.Post("/value/", app.RetrieveValueJSON)
 	r.Get("/", app.ListMetrics)
 	return app
 }

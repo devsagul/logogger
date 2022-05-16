@@ -61,7 +61,7 @@ func ReportMetrics(m poller.Metrics, host string) error {
 		metricsValue := reflected.Field(i).Interface()
 		metricsType := strings.ToLower(reflected.Type().Field(i).Type.Name())
 
-		url := fmt.Sprintf("%s/update", host)
+		url := fmt.Sprintf("%s/update/", host)
 
 		var m schema.Metrics
 		if metricsType == "gauge" {
