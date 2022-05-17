@@ -7,6 +7,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"io"
+	"log"
+	"logogger/internal/dumper"
 	"logogger/internal/schema"
 	"logogger/internal/storage"
 	"net/http"
@@ -17,6 +19,8 @@ import (
 type App struct {
 	store  storage.MetricsStorage
 	Router *chi.Mux
+	sync   bool
+	dumper dumper.Dumper
 }
 
 type errorHTTPHandler func(http.ResponseWriter, *http.Request) error
@@ -99,6 +103,9 @@ func (app App) updateValue(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	SafeWrite(w, http.StatusOK, "Status: OK")
+	if app.sync {
+		app.safeDump()
+	}
 	return nil
 }
 
@@ -181,6 +188,9 @@ func (app App) updateValueJSON(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	SafeWrite(w, http.StatusOK, string(serialized))
+	if app.sync {
+		go app.safeDump()
+	}
 	return nil
 }
 
@@ -228,11 +238,29 @@ func (app App) retrieveValueJSON(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func NewApp(store storage.MetricsStorage) *App {
+func (app *App) safeDump() {
+	log.Print("Dumping current storage state...")
+	l, err := app.store.List()
+	if err != nil {
+		log.Print("Could not retrieve values from storage")
+		return
+	}
+
+	err = app.dumper.Dump(l)
+	if err != nil {
+		log.Print("Could not write storage data")
+	}
+}
+
+func NewApp(
+	store storage.MetricsStorage,
+) *App {
 	app := new(App)
 	r := chi.NewRouter()
 	app.Router = r
 	app.store = store
+	app.dumper = dumper.NoOpDumper{}
+	app.sync = false
 
 	// useful middlewares
 	r.Use(middleware.RequestID)
@@ -245,5 +273,28 @@ func NewApp(store storage.MetricsStorage) *App {
 	r.With(middleware.SetHeader("Content-Type", "application/json")).Post("/update/", newHandler(app.updateValueJSON))
 	r.With(middleware.SetHeader("Content-Type", "application/json")).Post("/value/", newHandler(app.retrieveValueJSON))
 	r.With(middleware.SetHeader("Content-Type", "text/html")).Get("/", newHandler(app.listMetrics))
+	return app
+}
+
+func (app *App) WithDumper(d dumper.Dumper) *App {
+	app.dumper = d
+	return app
+}
+
+func (app *App) WithDumpInterval(interval time.Duration) *App {
+	if interval == 0 {
+		app.sync = true
+		return app
+	}
+
+	app.sync = false
+	t := time.NewTicker(interval)
+	go func() {
+		for {
+			<-t.C
+			app.safeDump()
+		}
+	}()
+
 	return app
 }

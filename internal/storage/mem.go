@@ -93,6 +93,21 @@ func (storage *MemStorage) List() ([]schema.Metrics, error) {
 	return res, nil
 }
 
+func (storage *MemStorage) BulkPut(values []schema.Metrics) error {
+	storage.mu.Lock()
+	defer storage.mu.Unlock()
+	for _, req := range values {
+		cur, found := storage.m[req.ID]
+		if found && cur.MType != req.MType {
+			return typeMismatch(req.ID, req.MType, cur.MType)
+		}
+
+		storage.m[req.ID] = req
+
+	}
+	return nil
+}
+
 func NewMemStorage() *MemStorage {
 	m := new(MemStorage)
 	m.m = map[string]schema.Metrics{}

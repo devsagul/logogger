@@ -405,3 +405,7 @@ func (faultyStorage) Increment(req schema.Metrics, value int64) error {
 func (faultyStorage) List() ([]schema.Metrics, error) {
 	return []schema.Metrics{}, errors.New("generic error")
 }
+
+func (faultyStorage) BulkPut([]schema.Metrics) error {
+	return errors.New("generic error")
+}
