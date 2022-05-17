@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"github.com/caarlos0/env/v6"
 	"io"
 	"log"
@@ -16,15 +17,24 @@ import (
 )
 
 type config struct {
-	Address       string        `env:"ADDRESS" envDefault:"localhost:8080"`
-	StoreInterval time.Duration `env:"STORE_INTERVAL" envDefault:"300s"`
-	StoreFile     string        `env:"STORE_FILE" envDefault:"/tmp/devops-metrics-db.json"`
-	Restore       bool          `env:"RESTORE" envDefault:"true"`
+	Address       string        `env:"ADDRESS"`
+	StoreInterval time.Duration `env:"STORE_INTERVAL"`
+	StoreFile     string        `env:"STORE_FILE"`
+	Restore       bool          `env:"RESTORE"`
+}
+
+var cfg config
+
+func init() {
+	flag.StringVar(&cfg.Address, "a", "localhost:8080", "Address of the server (to listen to)")
+	flag.DurationVar(&cfg.StoreInterval, "i", 300*time.Second, "Interval for storage state to be dumped on disk")
+	flag.StringVar(&cfg.StoreFile, "f", "/tmp/devops-metrics-db.json", "Path to the file for dumping storage state")
+	flag.BoolVar(&cfg.Restore, "r", true, "Restore store state from dump file on server initialization")
 }
 
 func main() {
 	log.Println("Initializing server...")
-	var cfg config
+	flag.Parse()
 	err := env.Parse(&cfg)
 	if err != nil {
 		log.Fatal("Could not parse config : ", err)

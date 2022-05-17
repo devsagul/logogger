@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"github.com/caarlos0/env/v6"
 	"log"
@@ -15,13 +16,21 @@ import (
 )
 
 type config struct {
-	PollInterval   time.Duration `env:"POLL_INTERVAL" envDefault:"2s"`
-	ReportInterval time.Duration `env:"REPORT_INTERVAL" envDefault:"10s"`
-	ReportHost     string        `env:"ADDRESS" envDefault:"localhost:8080"`
+	PollInterval   time.Duration `env:"POLL_INTERVAL"`
+	ReportInterval time.Duration `env:"REPORT_INTERVAL"`
+	ReportHost     string        `env:"ADDRESS"`
+}
+
+var cfg config
+
+func init() {
+	flag.DurationVar(&cfg.PollInterval, "p", 2*time.Second, "Interval of metrics polling")
+	flag.DurationVar(&cfg.ReportInterval, "r", 10*time.Second, "Interval of metrics reporting")
+	flag.StringVar(&cfg.ReportHost, "a", "localhost:8080", "Address of the server to report metrics to")
 }
 
 func main() {
-	var cfg config
+	flag.Parse()
 	err := env.Parse(&cfg)
 	if err != nil {
 		log.Println("Could not parse config")
