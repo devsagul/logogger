@@ -1,27 +1,42 @@
 package main
 
 import (
+	"fmt"
+	"github.com/caarlos0/env/v6"
 	"log"
 	"logogger/internal/poller"
 	"logogger/internal/reporter"
 	"logogger/internal/schema"
 	"os"
 	"os/signal"
+	"regexp"
 	"syscall"
 	"time"
 )
 
-const (
-	pollInterval   = 2 * time.Second
-	reportInterval = 10 * time.Second
-	reportHost     = "http://127.0.0.1:8080"
-)
+type config struct {
+	PollInterval   time.Duration `env:"POLL_INTERVAL" envDefault:"2s"`
+	ReportInterval time.Duration `env:"REPORT_INTERVAL" envDefault:"10s"`
+	ReportHost     string        `env:"REPORT_HOST" envDefault:"localhost:8080"`
+}
 
 func main() {
-	time.Sleep(time.Second)
+	var cfg config
+	err := env.Parse(&cfg)
+	if err != nil {
+		log.Println("Could not parse config")
+		os.Exit(1)
+	}
 
-	pollTicker := time.NewTicker(pollInterval)
-	reportTicker := time.NewTicker(reportInterval)
+	var reportHost = cfg.ReportHost
+
+	r := regexp.MustCompile(`https?://`)
+	if !r.MatchString(cfg.ReportHost) {
+		reportHost = fmt.Sprintf("http://%s", reportHost)
+	}
+
+	pollTicker := time.NewTicker(cfg.PollInterval)
+	reportTicker := time.NewTicker(cfg.ReportInterval)
 	channel := make(chan []schema.Metrics)
 	p, err := poller.NewPoller(0)
 	if err != nil {
