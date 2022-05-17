@@ -23,6 +23,7 @@ type config struct {
 }
 
 func main() {
+	log.Println("Initializing server...")
 	var cfg config
 	err := env.Parse(&cfg)
 	if err != nil {
@@ -36,6 +37,7 @@ func main() {
 
 	// restore storage if needed
 	if cfg.Restore {
+		log.Println("Restoring storage from file...")
 		func() {
 			f, err := os.OpenFile(cfg.StoreFile, os.O_RDONLY|os.O_CREATE, 0644)
 			if err != nil {
@@ -46,6 +48,7 @@ func main() {
 			n, err := io.Copy(buf, f)
 			if n == 0 {
 				// file is empty, valid scenario
+				// nothing to restore
 				return
 			}
 			if err != nil {
@@ -70,6 +73,7 @@ func main() {
 		}()
 	}
 
+	log.Println("Initializing dumper...")
 	d := dumper.NewSyncDumper(cfg.StoreFile)
 
 	defer func() {
@@ -80,7 +84,9 @@ func main() {
 	}()
 
 	duration := time.Duration(cfg.StoreInterval) * time.Second
+	log.Println("Initializing application...")
 	app := server.NewApp(store).WithDumper(d).WithDumpInterval(duration)
+	log.Println("Listening...")
 	err = http.ListenAndServe(cfg.Address, app.Router)
 	if err != nil {
 		log.Fatal("Error Starting the HTTP Server : ", err)
