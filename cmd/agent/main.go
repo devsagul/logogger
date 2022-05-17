@@ -17,7 +17,7 @@ import (
 type config struct {
 	PollInterval   time.Duration `env:"POLL_INTERVAL" envDefault:"2s"`
 	ReportInterval time.Duration `env:"REPORT_INTERVAL" envDefault:"10s"`
-	ReportHost     string        `env:"REPORT_HOST" envDefault:"localhost:8080"`
+	ReportHost     string        `env:"ADDRESS" envDefault:"localhost:8080"`
 }
 
 func main() {
