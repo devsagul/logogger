@@ -16,10 +16,10 @@ import (
 )
 
 type config struct {
-	Address       string `env:"ADDRESS" envDefault:"localhost:8080"`
-	StoreInterval int64  `env:"STORE_INTERVAL" envDefault:"300"`
-	StoreFile     string `env:"STORE_FILE" envDefault:"/tmp/devops-metrics-db.json"`
-	Restore       bool   `env:"RESTORE" envDefault:"true"`
+	Address       string        `env:"ADDRESS" envDefault:"localhost:8080"`
+	StoreInterval time.Duration `env:"STORE_INTERVAL" envDefault:"300s"`
+	StoreFile     string        `env:"STORE_FILE" envDefault:"/tmp/devops-metrics-db.json"`
+	Restore       bool          `env:"RESTORE" envDefault:"true"`
 }
 
 func main() {
@@ -83,9 +83,8 @@ func main() {
 		}
 	}()
 
-	duration := time.Duration(cfg.StoreInterval) * time.Second
 	log.Println("Initializing application...")
-	app := server.NewApp(store).WithDumper(d).WithDumpInterval(duration)
+	app := server.NewApp(store).WithDumper(d).WithDumpInterval(cfg.StoreInterval)
 	log.Println("Listening...")
 	err = http.ListenAndServe(cfg.Address, app.Router)
 	if err != nil {
