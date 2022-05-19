@@ -55,13 +55,13 @@ func NewPoller(start int64) (Poller, error) {
 func (p Poller) Poll() ([]schema.Metrics, error) {
 	err := p.store.Increment(schema.NewCounterRequest("PollCount"), 1)
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 
 	r := schema.NewGauge("RandomValue", rand.Float64())
 	err = p.store.Put(r)
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 
 	var memStats runtime.MemStats

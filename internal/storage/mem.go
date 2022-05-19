@@ -7,8 +7,6 @@ import (
 )
 
 type MemStorage struct {
-	m map[string]schema.Metrics
-
 	/**
 	Here lies the bright idea of using mutexes
 	for every key separately. Unfortunately,
@@ -18,12 +16,13 @@ type MemStorage struct {
 
 	So I use only one mutex for the whole storage.
 	*/
-	mu sync.Mutex
+	sync.Mutex
+	m map[string]schema.Metrics
 }
 
 func (storage *MemStorage) Put(req schema.Metrics) error {
-	storage.mu.Lock()
-	defer storage.mu.Unlock()
+	storage.Lock()
+	defer storage.Unlock()
 	cur, found := storage.m[req.ID]
 	if found && cur.MType != req.MType {
 		return typeMismatch(req.ID, req.MType, cur.MType)
@@ -36,9 +35,9 @@ func (storage *MemStorage) Put(req schema.Metrics) error {
 func (storage *MemStorage) Extract(req schema.Metrics) (schema.Metrics, error) {
 	// Note: this extract should not be re-used in other
 	// methods, this would require a recursive mutex
-	storage.mu.Lock()
+	storage.Lock()
 	value, found := storage.m[req.ID]
-	storage.mu.Unlock()
+	storage.Unlock()
 	if !found {
 		return req, notFound(req.ID)
 	}
@@ -53,8 +52,8 @@ func (storage *MemStorage) Increment(req schema.Metrics, value int64) error {
 		return incrementingNonCounterMetrics(req.ID, req.MType)
 	}
 
-	storage.mu.Lock()
-	defer storage.mu.Unlock()
+	storage.Lock()
+	defer storage.Unlock()
 
 	current, found := storage.m[req.ID]
 
@@ -94,8 +93,8 @@ func (storage *MemStorage) List() ([]schema.Metrics, error) {
 }
 
 func (storage *MemStorage) BulkPut(values []schema.Metrics) error {
-	storage.mu.Lock()
-	defer storage.mu.Unlock()
+	storage.Lock()
+	defer storage.Unlock()
 	for _, req := range values {
 		cur, found := storage.m[req.ID]
 		if found && cur.MType != req.MType {
