@@ -2,13 +2,14 @@ package poller
 
 import (
 	"fmt"
-	"golang.org/x/sync/errgroup"
 	"logogger/internal/schema"
 	"logogger/internal/storage"
 	"math/rand"
 	"reflect"
 	"runtime"
 	"strconv"
+
+	"golang.org/x/sync/errgroup"
 )
 
 var SysMetrics = [...]string{

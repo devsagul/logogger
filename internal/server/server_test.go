@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"logogger/internal/schema"
 	"logogger/internal/storage"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestApp_RetrieveValue(t *testing.T) {

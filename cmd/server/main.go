@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"flag"
-	"github.com/caarlos0/env/v6"
 	"io"
 	"log"
 	"logogger/internal/dumper"
@@ -14,6 +13,8 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/caarlos0/env/v6"
 )
 
 type config struct {

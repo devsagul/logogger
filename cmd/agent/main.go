@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/caarlos0/env/v6"
 	"log"
 	"logogger/internal/poller"
 	"logogger/internal/reporter"
@@ -13,6 +12,8 @@ import (
 	"regexp"
 	"syscall"
 	"time"
+
+	"github.com/caarlos0/env/v6"
 )
 
 type config struct {

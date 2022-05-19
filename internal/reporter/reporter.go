@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
-	"golang.org/x/sync/errgroup"
 	"log"
 	"logogger/internal/schema"
 	"net/http"
 	"time"
+
+	"github.com/google/uuid"
+	"golang.org/x/sync/errgroup"
 )
 
 type ServerResponse struct {
