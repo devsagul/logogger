@@ -1,14 +1,13 @@
 package storage
 
-type MetricDef struct {
-	Type  string
-	Name  string
-	Value interface{}
-}
+import (
+	"logogger/internal/schema"
+)
 
 type MetricsStorage interface {
-	Increment(key string, value interface{}) error
-	Get(key string) (value MetricDef, found bool, err error)
-	Put(key string, value MetricDef) error
-	List() ([]MetricDef, error)
+	Put(value schema.Metrics) error
+	Extract(req schema.Metrics) (schema.Metrics, error)
+	Increment(req schema.Metrics, value int64) error
+	List() ([]schema.Metrics, error)
+	BulkPut(values []schema.Metrics) error
 }

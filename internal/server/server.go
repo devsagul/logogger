@@ -1,211 +1,302 @@
 package server
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	"io"
 	"log"
+	"logogger/internal/dumper"
+	"logogger/internal/schema"
 	"logogger/internal/storage"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
-
-type storageResponse struct {
-	value storage.MetricDef
-	found bool
-	err   error
-}
-
-type listResponse struct {
-	list []storage.MetricDef
-	err  error
-}
 
 type App struct {
 	store  storage.MetricsStorage
 	Router *chi.Mux
+	sync   bool
+	dumper dumper.Dumper
 }
 
-func safeWrite(w http.ResponseWriter, body string) {
-	_, err := w.Write([]byte(body))
-	if err != nil {
-		log.Printf("Error: could not write response. Cause: %s", err)
+type errorHTTPHandler func(http.ResponseWriter, *http.Request) error
+
+func newHandler(handler errorHTTPHandler) http.HandlerFunc {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		errChan := make(chan error)
+		ctx := request.Context()
+
+		go func() {
+			errChan <- handler(writer, request)
+		}()
+
+		select {
+		case err := <-errChan:
+			if err != nil {
+				WriteError(writer, err)
+			}
+		case <-ctx.Done():
+			return
+		}
 	}
 }
 
-func (app App) getValue(w http.ResponseWriter, r *http.Request) {
+func (app App) retrieveValue(w http.ResponseWriter, r *http.Request) error {
 	valueType := chi.URLParam(r, "Type")
 	name := chi.URLParam(r, "Name")
 
-	ctx := r.Context()
-
-	if valueType != "counter" && valueType != "gauge" {
-		w.WriteHeader(http.StatusNotImplemented)
-		body := fmt.Sprintf("Status: ERROR\nUnknown metric type %s", name)
-		safeWrite(w, body)
-		return
-	}
-
-	read := make(chan storageResponse)
-
-	go func() {
-		value, found, err := app.store.Get(name)
-		read <- storageResponse{value, found, err}
-	}()
-
-	select {
-	case response := <-read:
-		if response.err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			body := "Internal Server Error"
-			safeWrite(w, body)
-			return
-		} else if !response.found {
-			w.WriteHeader(http.StatusNotFound)
-			body := "NotFound"
-			safeWrite(w, body)
-			return
-		} else {
-			var body string
-			if valueType == "counter" {
-				v := response.value.Value.(int64)
-				body = fmt.Sprintf("%d", v)
-			} else {
-				v := response.value.Value.(float64)
-				body = strconv.FormatFloat(v, 'f', -1, 64)
-			}
-
-			w.WriteHeader(http.StatusOK)
-			safeWrite(w, body)
-			return
+	var req schema.Metrics
+	switch valueType {
+	case "counter":
+		req = schema.NewCounterRequest(name)
+	case "gauge":
+		req = schema.NewGaugeRequest(name)
+	default:
+		return &requestError{
+			status: http.StatusNotImplemented,
+			body:   fmt.Sprintf("Could not perform requested operation on metric type %s", valueType),
 		}
-	case <-ctx.Done():
-		return
 	}
+
+	value, err := app.store.Extract(req)
+	if err != nil {
+		return err
+	}
+
+	_, _, body := value.Explain()
+	SafeWrite(w, http.StatusOK, body)
+	return nil
 }
 
-func (app App) updateValue(w http.ResponseWriter, r *http.Request) {
+func (app App) updateValue(w http.ResponseWriter, r *http.Request) error {
 	valueType := chi.URLParam(r, "Type")
 	name := chi.URLParam(r, "Name")
 	rawValue := chi.URLParam(r, "Value")
 
-	ctx := r.Context()
-
-	if valueType != "counter" && valueType != "gauge" {
-		w.WriteHeader(http.StatusNotImplemented)
-		body := fmt.Sprintf("Status: ERROR\nUnknown metric type %s", name)
-		safeWrite(w, body)
-		return
+	value, err := ParseMetric(valueType, name, rawValue)
+	if err != nil {
+		return err
 	}
 
-	var v interface{}
-	var err error
-	if valueType == "counter" {
-		v, err = strconv.ParseInt(rawValue, 10, 64)
-	} else {
-		v, err = strconv.ParseFloat(rawValue, 64)
+	switch value.MType {
+	case "counter":
+		err = app.store.Increment(value, *value.Delta)
+		switch err.(type) {
+		case *storage.NotFound:
+			err = app.store.Put(value)
+		}
+	case "gauge":
+		err = app.store.Put(value)
+	default:
+		return &requestError{
+			status: http.StatusNotImplemented,
+			body:   fmt.Sprintf("Could not perform requested operation on metric type %s", valueType),
+		}
 	}
 
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		body := fmt.Sprintf("Status: ERROR\nCouldn't parse float from %s", rawValue)
-		safeWrite(w, body)
-		return
+		return err
 	}
 
-	write := make(chan error)
-	go func() {
-		var err error
-		if valueType == "counter" {
-			err = app.store.Increment(name, v)
-		} else {
-			err = app.store.Put(name, storage.MetricDef{Type: valueType, Name: name, Value: v})
-		}
-		write <- err
-	}()
+	SafeWrite(w, http.StatusOK, "Status: OK")
+	if app.sync {
+		app.safeDump()
+	}
+	return nil
+}
 
-	select {
-	case err := <-write:
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			body := "Internal Server Error"
-			safeWrite(w, body)
-			return
-		}
+func (app App) listMetrics(w http.ResponseWriter, _ *http.Request) error {
+	list, err := app.store.List()
+	if err != nil {
+		return err
+	}
+
+	if len(list) == 0 {
 		w.WriteHeader(http.StatusOK)
-		body := "Status: OK"
-		safeWrite(w, body)
-		return
-	case <-ctx.Done():
-		return
+		return nil
 	}
+	var sb strings.Builder
+
+	header := "<table><tr><th>Type</th><th>Name</th><th>Value</th></tr>"
+	sb.Write([]byte(header))
+	for _, metrics := range list {
+		name, mType, value := metrics.Explain()
+		row := fmt.Sprintf("<tr><td>%s</td><td>%s</td><td>%s</td></tr>", name, mType, value)
+		sb.Write([]byte(row))
+	}
+	footer := "</table>"
+	sb.Write([]byte(footer))
+	SafeWrite(w, http.StatusOK, sb.String())
+	return nil
 }
 
-func (app App) listMetrics(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+func (app App) updateValueJSON(w http.ResponseWriter, r *http.Request) error {
+	if r.Body == nil {
+		return ValidationError("empty body")
+	}
 
-	ch := make(chan listResponse)
-	go func() {
-		list, err := app.store.List()
-		ch <- listResponse{list, err}
-	}()
+	data, err := io.ReadAll(r.Body)
+	if err != nil {
+		return err
+	}
 
-	select {
-	case res := <-ch:
-		if res.err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			body := "Internal Server Error"
-			safeWrite(w, body)
-			return
-		} else {
-			w.Header().Set("Content-Type", "text/html")
-			w.WriteHeader(http.StatusOK)
-			var sb strings.Builder
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
 
-			header := "<table><tr><th>Type</th><th>Name</th><th>Value</th></tr>"
-			sb.Write([]byte(header))
+	var m schema.Metrics
+	err = decoder.Decode(&m)
+	if err != nil {
+		return ValidationError(err.Error())
+	}
 
-			for _, def := range res.list {
-				t := def.Type
-				n := def.Name
-				var s string
-				if t == "counter" {
-					s = fmt.Sprintf("<tr><td>%s</td><td>%s</td><td>%d</td></tr>", t, n, def.Value.(int64))
-				} else {
-					s = fmt.Sprintf("<tr><td>%s</td><td>%s</td><td>%f</td></tr>", t, n, def.Value.(float64))
-				}
-				sb.Write([]byte(s))
-			}
+	if m.MType == "counter" && m.Delta == nil || m.MType == "gauge" && m.Value == nil {
+		return ValidationError("Missing Value")
+	}
 
-			footer := "</table>"
-			sb.Write([]byte(footer))
-
-			body := sb.String()
-			safeWrite(w, body)
-			return
+	switch m.MType {
+	case "counter":
+		err = app.store.Increment(m, *m.Delta)
+		switch err.(type) {
+		case *storage.NotFound:
+			err = app.store.Put(m)
 		}
-	case <-ctx.Done():
+	case "gauge":
+		err = app.store.Put(m)
+	default:
+		return &requestError{
+			status: http.StatusNotImplemented,
+			body:   fmt.Sprintf("Could not perform requested operation on metric type %s", m.MType),
+		}
+	}
+
+	if err != nil {
+		return err
+	}
+
+	value, err := app.store.Extract(m)
+	if err != nil {
+		return err
+	}
+
+	serialized, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+
+	SafeWrite(w, http.StatusOK, string(serialized))
+	if app.sync {
+		go app.safeDump()
+	}
+	return nil
+}
+
+func (app App) retrieveValueJSON(w http.ResponseWriter, r *http.Request) error {
+	if r.Body == nil {
+		return ValidationError("empty body")
+	}
+
+	data, err := io.ReadAll(r.Body)
+	if err != nil {
+		return ValidationError(err.Error())
+	}
+
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+
+	var m schema.Metrics
+	err = decoder.Decode(&m)
+	if err != nil {
+		return ValidationError(err.Error())
+	}
+
+	var value schema.Metrics
+	switch m.MType {
+	case "counter":
+		value, err = app.store.Extract(m)
+	case "gauge":
+		value, err = app.store.Extract(m)
+	default:
+		return &requestError{
+			status: http.StatusNotImplemented,
+			body:   fmt.Sprintf("Could not perform requested operation on metric type %s", m.MType),
+		}
+	}
+	if err != nil {
+		return err
+	}
+
+	serialized, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+
+	SafeWrite(w, http.StatusOK, string(serialized))
+	return nil
+}
+
+func (app *App) safeDump() {
+	log.Print("Dumping current storage state...")
+	l, err := app.store.List()
+	if err != nil {
+		log.Print("Could not retrieve values from storage")
 		return
+	}
+
+	err = app.dumper.Dump(l)
+	if err != nil {
+		log.Print("Could not write storage data")
 	}
 }
 
-func NewApp() *App {
+func NewApp(
+	store storage.MetricsStorage,
+) *App {
 	app := new(App)
 	r := chi.NewRouter()
 	app.Router = r
-	app.store = storage.NewMemStorage()
+	app.store = store
+	app.dumper = dumper.NoOpDumper{}
+	app.sync = false
 
-	// полезные мидлвари
+	// useful middlewares
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(60 * time.Second))
-	r.Use(middleware.SetHeader("Content-Type", "text/plain"))
+	r.Use(middleware.Compress(5))
 
-	r.Post("/update/{Type}/{Name}/{Value}", app.updateValue)
-	r.Get("/value/{Type}/{Name}", app.getValue)
-	r.Get("/", app.listMetrics)
+	r.With(middleware.SetHeader("Content-Type", "text/plain")).Post("/update/{Type}/{Name}/{Value}", newHandler(app.updateValue))
+	r.With(middleware.SetHeader("Content-Type", "text/plain")).Get("/value/{Type}/{Name}", newHandler(app.retrieveValue))
+	r.With(middleware.SetHeader("Content-Type", "application/json")).Post("/update/", newHandler(app.updateValueJSON))
+	r.With(middleware.SetHeader("Content-Type", "application/json")).Post("/value/", newHandler(app.retrieveValueJSON))
+	r.With(middleware.SetHeader("Content-Type", "text/html")).Get("/", newHandler(app.listMetrics))
+	return app
+}
+
+func (app *App) WithDumper(d dumper.Dumper) *App {
+	app.dumper = d
+	return app
+}
+
+func (app *App) WithDumpInterval(interval time.Duration) *App {
+	if interval == 0 {
+		app.sync = true
+		return app
+	}
+
+	app.sync = false
+	t := time.NewTicker(interval)
+	go func() {
+		for {
+			<-t.C
+			app.safeDump()
+		}
+	}()
+
 	return app
 }

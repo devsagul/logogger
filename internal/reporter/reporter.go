@@ -1,14 +1,16 @@
 package reporter
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
-	"golang.org/x/sync/errgroup"
 	"log"
-	"logogger/internal/poller"
+	"logogger/internal/schema"
 	"net/http"
-	"reflect"
-	"strings"
 	"time"
+
+	"github.com/google/uuid"
+	"golang.org/x/sync/errgroup"
 )
 
 type ServerResponse struct {
@@ -18,41 +20,51 @@ type ServerResponse struct {
 	dur  time.Duration
 }
 
-func PostRequest(url string) error {
-	log.Printf("Sending metrics to %s", url)
-	start := time.Now()
-	resp, err := http.Post(url, "text/plain", nil)
-	dur := time.Since(start)
+func postRequest(url string, m schema.Metrics) error {
+	id, err := uuid.NewRandom()
 	if err != nil {
-		log.Printf("Got error after %dms", dur.Milliseconds())
-	} else {
-		_ = resp.Body.Close()
-		log.Printf("Got response after %dms", dur.Milliseconds())
+		return err
+	}
+	log.Printf("%s, Sending %s to %s", id, m.ID, url)
+	start := time.Now()
+	b, err := json.Marshal(&m)
+	if err != nil {
+		return err
+	}
+	request, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Content-Type", "application/json; charset=UTF-8")
+
+	client := &http.Client{}
+	dur := time.Since(start)
+	resp, err := client.Do(request)
+	if err != nil {
+		log.Printf("%s Got error after %dms: %s", id, dur.Milliseconds(), err.Error())
+		return err
+	}
+	err = resp.Body.Close()
+	log.Printf("Got response after %dms", dur.Milliseconds())
+	if err == nil {
+		code := resp.StatusCode
+		if code != 200 {
+			return fmt.Errorf("%s server returned %d code", id, code)
+		}
 	}
 	return err
 }
 
-func ReportMetrics(m poller.Metrics, host string) error {
-	reflected := reflect.ValueOf(m)
+func ReportMetrics(l []schema.Metrics, host string) error {
 	eg := &errgroup.Group{}
 
-	for i := 0; i < reflected.NumField(); i++ {
-		metricsField := reflected.Type().Field(i).Name
-		metricsValue := reflected.Field(i).Interface()
-		metricsType := strings.ToLower(reflected.Type().Field(i).Type.Name())
-		var formatString string
-		var url string
-		if metricsType == "gauge" {
-			formatString = "http://%s/update/%s/%s/%f"
-			url = fmt.Sprintf(formatString, host, metricsType, metricsField, metricsValue)
-		} else {
-			formatString = "http://%s/update/%s/%s/%d"
-			url = fmt.Sprintf(formatString, host, metricsType, metricsField, metricsValue)
-		}
-
+	for _, m := range l {
+		m := m
+		url := fmt.Sprintf("%s/update/", host)
 		eg.Go(func() error {
-			return PostRequest(url)
+			return postRequest(url, m)
 		})
 	}
+
 	return eg.Wait()
 }

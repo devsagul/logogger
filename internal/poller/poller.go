@@ -1,98 +1,99 @@
 package poller
 
 import (
+	"fmt"
+	"logogger/internal/schema"
+	"logogger/internal/storage"
 	"math/rand"
+	"reflect"
 	"runtime"
+	"strconv"
+
+	"golang.org/x/sync/errgroup"
 )
 
-type gauge float64
-type counter int64
-
-type Metrics struct {
-	Alloc         gauge
-	BuckHashSys   gauge
-	Frees         gauge
-	GCCPUFraction gauge
-	GCSys         gauge
-	HeapAlloc     gauge
-	HeapIdle      gauge
-	HeapInuse     gauge
-	HeapObjects   gauge
-	HeapReleased  gauge
-	HeapSys       gauge
-	LastGC        gauge
-	Lookups       gauge
-	MCacheInuse   gauge
-	MCacheSys     gauge
-	MSpanInuse    gauge
-	Mallocs       gauge
-	NextGC        gauge
-	NumForcedGC   gauge
-	NumGC         gauge
-	OtherSys      gauge
-	PauseTotalNs  gauge
-	StackInuse    gauge
-	StackSys      gauge
-	Sys           gauge
-	TotalAlloc    gauge
-	PollCount     counter
-	RandomValue   gauge
+var SysMetrics = [...]string{
+	"Alloc",
+	"BuckHashSys",
+	"Frees",
+	"GCCPUFraction",
+	"GCSys",
+	"HeapAlloc",
+	"HeapIdle",
+	"HeapInuse",
+	"HeapObjects",
+	"HeapReleased",
+	"HeapSys",
+	"LastGC",
+	"Lookups",
+	"MCacheInuse",
+	"MCacheSys",
+	"MSpanInuse",
+	"MSpanSys",
+	"Mallocs",
+	"NextGC",
+	"NumForcedGC",
+	"NumGC",
+	"OtherSys",
+	"PauseTotalNs",
+	"StackInuse",
+	"StackSys",
+	"Sys",
+	"TotalAlloc",
 }
 
-func Sequence(start int64) (func() int64, chan struct{}) {
-	i := start
-	reset := make(chan struct{})
-
-	go func() {
-		for {
-			<-reset
-			i = start
-		}
-	}()
-
-	return func() int64 {
-		i++
-		return i
-	}, reset
+type Poller struct {
+	store storage.MetricsStorage
+	start int64
 }
 
-func Poller(start int64) (func() Metrics, chan struct{}) {
-	c, reset := Sequence(start)
+func NewPoller(start int64) (Poller, error) {
+	store := storage.NewMemStorage()
+	err := store.Put(schema.NewCounter("PollCount", start))
+	return Poller{store, start}, err
+}
 
-	return func() Metrics {
-		var memstats runtime.MemStats
+func (p Poller) Poll() ([]schema.Metrics, error) {
+	err := p.store.Increment(schema.NewCounterRequest("PollCount"), 1)
+	if err != nil {
+		return nil, err
+	}
 
-		runtime.ReadMemStats(&memstats)
+	r := schema.NewGauge("RandomValue", rand.Float64())
+	err = p.store.Put(r)
+	if err != nil {
+		return nil, err
+	}
 
-		return Metrics{
-			Alloc:         gauge(memstats.Alloc),
-			BuckHashSys:   gauge(memstats.BuckHashSys),
-			Frees:         gauge(memstats.Frees),
-			GCCPUFraction: gauge(memstats.GCCPUFraction),
-			GCSys:         gauge(memstats.GCSys),
-			HeapAlloc:     gauge(memstats.HeapAlloc),
-			HeapIdle:      gauge(memstats.HeapIdle),
-			HeapInuse:     gauge(memstats.HeapInuse),
-			HeapObjects:   gauge(memstats.HeapObjects),
-			HeapReleased:  gauge(memstats.HeapReleased),
-			HeapSys:       gauge(memstats.HeapSys),
-			LastGC:        gauge(memstats.LastGC),
-			Lookups:       gauge(memstats.Lookups),
-			MCacheInuse:   gauge(memstats.MCacheInuse),
-			MCacheSys:     gauge(memstats.MCacheSys),
-			MSpanInuse:    gauge(memstats.MSpanInuse),
-			Mallocs:       gauge(memstats.Mallocs),
-			NextGC:        gauge(memstats.NextGC),
-			NumForcedGC:   gauge(memstats.NumForcedGC),
-			NumGC:         gauge(memstats.NumGC),
-			OtherSys:      gauge(memstats.OtherSys),
-			PauseTotalNs:  gauge(memstats.PauseTotalNs),
-			StackInuse:    gauge(memstats.StackInuse),
-			StackSys:      gauge(memstats.StackSys),
-			Sys:           gauge(memstats.Sys),
-			TotalAlloc:    gauge(memstats.TotalAlloc),
-			PollCount:     counter(c()),
-			RandomValue:   gauge(rand.Float64()),
-		}
-	}, reset
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+
+	reflected := reflect.ValueOf(memStats)
+
+	eg := &errgroup.Group{}
+	for _, stat := range SysMetrics {
+		stat := stat
+		eg.Go(func() error {
+			v := reflected.FieldByName(stat).Interface()
+			f, err := strconv.ParseFloat(fmt.Sprintf("%v", v), 64)
+			if err != nil {
+				return err
+			}
+			err = p.store.Put(schema.NewGauge(stat, f))
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+	}
+
+	err = eg.Wait()
+	if err != nil {
+		return nil, err
+	}
+	return p.store.List()
+}
+
+func (p Poller) Reset() error {
+	return p.store.Put(schema.NewCounter("PollCount", p.start))
 }
