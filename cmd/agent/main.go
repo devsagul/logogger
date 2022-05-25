@@ -102,7 +102,7 @@ func report(l []schema.Metrics, host string, key string) error {
 	if key != "" {
 		eg := errgroup.Group{}
 		for _, m := range l {
-			m := m
+			m := &m
 			eg.Go(func() error {
 				return m.Sign(key)
 			})
