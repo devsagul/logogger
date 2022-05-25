@@ -194,6 +194,12 @@ func (app App) updateValueJSON(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
+	if app.key != "" {
+		if err = value.Sign(app.key); err != nil {
+			return err
+		}
+	}
+
 	serialized, err := json.Marshal(value)
 	if err != nil {
 		return err
