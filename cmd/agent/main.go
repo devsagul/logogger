@@ -101,15 +101,22 @@ func main() {
 func report(l []schema.Metrics, host string, key string) error {
 	if key != "" {
 		eg := errgroup.Group{}
+		var signed []schema.Metrics
 		for _, m := range l {
-			m := &m
+			m := m
 			eg.Go(func() error {
-				return m.Sign(key)
+				err := m.Sign(key)
+				if err != nil {
+					return err
+				}
+				signed = append(signed, m)
+				return nil
 			})
 		}
 		if err := eg.Wait(); err != nil {
 			return err
 		}
+		l = signed
 	}
 
 	err := reporter.ReportMetrics(l, host)
