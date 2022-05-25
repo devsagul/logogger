@@ -22,6 +22,7 @@ type App struct {
 	Router *chi.Mux
 	sync   bool
 	dumper dumper.Dumper
+	key    string
 }
 
 type errorHTTPHandler func(http.ResponseWriter, *http.Request) error
@@ -158,6 +159,16 @@ func (app App) updateValueJSON(w http.ResponseWriter, r *http.Request) error {
 		return ValidationError("Missing Value")
 	}
 
+	if app.key != "" {
+		signed, err := m.IsSignedWithKey(app.key)
+		if err != nil {
+			return err
+		}
+		if !signed {
+			return ValidationError("signature mismatch")
+		}
+	}
+
 	switch m.MType {
 	case "counter":
 		err = app.store.Increment(m, *m.Delta)
@@ -230,6 +241,13 @@ func (app App) retrieveValueJSON(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
+	if app.key != "" {
+		err = value.Sign(app.key)
+		if err != nil {
+			return err
+		}
+	}
+
 	serialized, err := json.Marshal(value)
 	if err != nil {
 		return err
@@ -262,6 +280,7 @@ func NewApp(
 	app.store = store
 	app.dumper = dumper.NoOpDumper{}
 	app.sync = false
+	app.key = ""
 
 	// useful middlewares
 	r.Use(middleware.RequestID)
@@ -298,5 +317,10 @@ func (app *App) WithDumpInterval(interval time.Duration) *App {
 		}
 	}()
 
+	return app
+}
+
+func (app *App) WithKey(key string) *App {
+	app.key = key
 	return app
 }

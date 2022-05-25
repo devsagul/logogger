@@ -1,6 +1,9 @@
 package schema
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strconv"
 )
@@ -10,10 +13,11 @@ type Metrics struct {
 	MType string   `json:"type"`
 	Delta *int64   `json:"delta,omitempty"`
 	Value *float64 `json:"value,omitempty"`
+	Hash  string   `json:"hash,omitempty"`
 }
 
 func NewEmptyMetrics() Metrics {
-	return Metrics{"", "", nil, nil}
+	return Metrics{"", "", nil, nil, ""}
 }
 
 func NewCounterRequest(id string) Metrics {
@@ -46,4 +50,64 @@ func (m Metrics) Explain() (string, string, string) {
 	default:
 	}
 	return m.ID, m.MType, value
+}
+
+type hashingMetricsError struct {
+	reason string
+}
+
+func (e hashingMetricsError) Error() string {
+	return e.reason
+}
+
+func (m Metrics) hash(key string) (string, error) {
+	if key == "" {
+		return "", hashingMetricsError{"can't sign metrics with empty key"}
+	}
+	var data string
+	switch m.MType {
+	case "counter":
+		if m.Delta == nil {
+			return "", hashingMetricsError{"cannot sign metrics without value"}
+		}
+		data = fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta)
+	case "gauge":
+		if m.Value == nil {
+			return "", hashingMetricsError{"cannot sign metrics without value"}
+		}
+		data = fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value)
+	default:
+		return "", hashingMetricsError{fmt.Sprintf("unknown metrics type to sign: %s", m.MType)}
+	}
+
+	h := hmac.New(sha256.New, []byte(key))
+	_, err := h.Write([]byte(data))
+	if err != nil {
+		return "", err
+	}
+	sum := h.Sum(nil)
+	return hex.EncodeToString(sum), err
+}
+
+func (m *Metrics) Sign(key string) error {
+	h, err := m.hash(key)
+	if err != nil {
+		return err
+	}
+	m.Hash = h
+	return nil
+}
+
+func (m Metrics) IsSignedWithKey(key string) (bool, error) {
+	h, err := m.hash(key)
+	if err != nil {
+		switch err.(type) {
+		case hashingMetricsError:
+			// the value could not be hashed at all -> it was not signed with key
+			return false, nil
+		default:
+			return false, err
+		}
+	}
+	return m.Hash == h, nil
 }

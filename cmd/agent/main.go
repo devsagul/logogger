@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"golang.org/x/sync/errgroup"
 	"log"
 	"logogger/internal/poller"
 	"logogger/internal/reporter"
@@ -20,6 +21,7 @@ type config struct {
 	PollInterval   time.Duration `env:"POLL_INTERVAL"`
 	ReportInterval time.Duration `env:"REPORT_INTERVAL"`
 	ReportHost     string        `env:"ADDRESS"`
+	Key            string        `env:"KEY"`
 }
 
 var cfg config
@@ -28,6 +30,7 @@ func init() {
 	flag.DurationVar(&cfg.PollInterval, "p", 2*time.Second, "Interval of metrics polling")
 	flag.DurationVar(&cfg.ReportInterval, "r", 10*time.Second, "Interval of metrics reporting")
 	flag.StringVar(&cfg.ReportHost, "a", "localhost:8080", "Address of the server to report metrics to")
+	flag.StringVar(&cfg.Key, "k", "", "Secret key to sign metrics (should be shared between server and agent)")
 }
 
 func main() {
@@ -78,7 +81,7 @@ func main() {
 			case metrics := <-channel:
 				l = metrics
 			case <-reportTicker.C:
-				err := reporter.ReportMetrics(l, reportHost)
+				err := report(l, reportHost, cfg.Key)
 				if err == nil {
 					err = p.Reset()
 					if err != nil {
@@ -93,4 +96,21 @@ func main() {
 			}
 		}
 	}()
+}
+
+func report(l []schema.Metrics, host string, key string) error {
+	if key != "" {
+		eg := errgroup.Group{}
+		for _, m := range l {
+			eg.Go(func() error {
+				return m.Sign(key)
+			})
+		}
+		if err := eg.Wait(); err != nil {
+			return err
+		}
+	}
+
+	err := reporter.ReportMetrics(l, host)
+	return err
 }
