@@ -234,15 +234,15 @@ func (app App) retrieveValueJSON(w http.ResponseWriter, r *http.Request) error {
 	var value schema.Metrics
 	switch m.MType {
 	case "counter":
-		value, err = app.store.Extract(m)
 	case "gauge":
-		value, err = app.store.Extract(m)
 	default:
 		return &requestError{
 			status: http.StatusNotImplemented,
 			body:   fmt.Sprintf("Could not perform requested operation on metric type %s", m.MType),
 		}
 	}
+
+	value, err = app.store.Extract(m)
 	if err != nil {
 		return err
 	}
