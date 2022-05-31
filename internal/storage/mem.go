@@ -23,11 +23,6 @@ type MemStorage struct {
 func (storage *MemStorage) Put(req schema.Metrics) error {
 	storage.Lock()
 	defer storage.Unlock()
-	cur, found := storage.m[req.ID]
-	if found && cur.MType != req.MType {
-		return typeMismatch(req.ID, req.MType, cur.MType)
-	}
-
 	storage.m[req.ID] = req
 	return nil
 }
@@ -96,14 +91,16 @@ func (storage *MemStorage) BulkPut(values []schema.Metrics) error {
 	storage.Lock()
 	defer storage.Unlock()
 	for _, req := range values {
-		cur, found := storage.m[req.ID]
-		if found && cur.MType != req.MType {
-			return typeMismatch(req.ID, req.MType, cur.MType)
-		}
-
 		storage.m[req.ID] = req
-
 	}
+	return nil
+}
+
+func (*MemStorage) Ping() error {
+	return nil
+}
+
+func (*MemStorage) Close() error {
 	return nil
 }
 
