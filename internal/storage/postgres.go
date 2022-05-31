@@ -17,7 +17,7 @@ type PostgresStorage struct {
 func (p *PostgresStorage) Put(req schema.Metrics) error {
 	switch req.MType {
 	case "counter":
-		putQuery, err := p.db.Prepare("DELETE FROM metric WHERE id = ?; INSERT INTO metric(id, type, delta, value) VALUES(?, counter, ?, NULL)")
+		putQuery, err := p.db.Prepare("DELETE FROM metric WHERE id = ?; INSERT INTO metric(id, type, delta, value) VALUES(?, 'counter', ?, NULL)")
 		if err != nil {
 			return err
 		}
@@ -26,7 +26,7 @@ func (p *PostgresStorage) Put(req schema.Metrics) error {
 			return err
 		}
 	case "gauge":
-		putQuery, err := p.db.Prepare("DELETE FROM metric WHERE id = ?; INSERT INTO gauge(id, type, delta, value) VALUES(?, gauge, NULL, ?)")
+		putQuery, err := p.db.Prepare("DELETE FROM metric WHERE id = ?; INSERT INTO gauge(id, type, delta, value) VALUES(?, 'gauge', NULL, ?)")
 		if err != nil {
 			return err
 		}
