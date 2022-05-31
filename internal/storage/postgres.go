@@ -53,7 +53,7 @@ func (p *PostgresStorage) Extract(req schema.Metrics) (schema.Metrics, error) {
 		if errors.As(err, &sql.ErrNoRows) {
 			return schema.NewEmptyMetrics(), notFound(req.ID)
 		}
-		return schema.NewEmptyMetrics(), err(req.ID)
+		return schema.NewEmptyMetrics(), err
 	}
 	if res.MType != req.MType {
 		return schema.NewEmptyMetrics(), typeMismatch(req.ID, req.MType, res.MType)
