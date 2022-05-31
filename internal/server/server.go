@@ -297,6 +297,7 @@ func NewApp(
 	app.dumper = dumper.NoOpDumper{}
 	app.sync = false
 	app.key = ""
+	app.db = store
 
 	// useful middlewares
 	r.Use(middleware.RequestID)
