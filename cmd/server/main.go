@@ -66,7 +66,7 @@ func main() {
 	}()
 
 	// restore storage if needed
-	if cfg.Restore {
+	if cfg.Restore && cfg.DatabaseDSN == "" {
 		log.Println("Restoring storage from file...")
 		func() {
 			f, err := os.OpenFile(cfg.StoreFile, os.O_RDONLY|os.O_CREATE, 0644)
