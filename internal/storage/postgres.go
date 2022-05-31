@@ -21,7 +21,7 @@ func (p *PostgresStorage) Put(req schema.Metrics) error {
 		if err != nil {
 			return err
 		}
-		_, err = putQuery.Exec(req.ID, *req.Delta)
+		_, err = putQuery.Exec(req.ID, req.ID, *req.Delta)
 		if err != nil {
 			return err
 		}
