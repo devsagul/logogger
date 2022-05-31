@@ -23,7 +23,7 @@ type config struct {
 	StoreFile     string        `env:"STORE_FILE"`
 	Restore       bool          `env:"RESTORE"`
 	Key           string        `env:"KEY"`
-	DatabaseDSN   string        `env:"DATABASE_DSN"`
+	//DatabaseDSN   string        `env:"DATABASE_DSN"`
 }
 
 var cfg config
@@ -34,7 +34,7 @@ func init() {
 	flag.StringVar(&cfg.StoreFile, "f", "/tmp/devops-metrics-db.json", "Path to the file for dumping storage state")
 	flag.BoolVar(&cfg.Restore, "r", true, "Restore store state from dump file on server initialization")
 	flag.StringVar(&cfg.Key, "k", "", "Secret key to sign metrics (should be shared between server and agent)")
-	flag.StringVar(&cfg.DatabaseDSN, "d", "", "Database connection string")
+	//flag.StringVar(&cfg.DatabaseDSN, "d", "", "Database connection string")
 }
 
 func main() {
@@ -49,14 +49,14 @@ func main() {
 	}
 
 	var store storage.MetricsStorage
-	if cfg.DatabaseDSN == "" {
-		store = storage.NewMemStorage()
-	} else {
+	//if cfg.DatabaseDSN == "" {
+	store = storage.NewMemStorage()
+	/*} else {
 		store, err = storage.NewPostgresStorage(cfg.DatabaseDSN)
 		if err != nil {
 			log.Fatalf("error during storage initialization: %s", err.Error())
 		}
-	}
+	}*/
 	defer func() {
 		err = store.Close()
 		if err != nil {
@@ -65,7 +65,7 @@ func main() {
 	}()
 
 	// restore storage if needed
-	if cfg.Restore && cfg.DatabaseDSN != "" {
+	if cfg.Restore {
 		log.Println("Restoring storage from file...")
 		func() {
 			f, err := os.OpenFile(cfg.StoreFile, os.O_RDONLY|os.O_CREATE, 0644)
