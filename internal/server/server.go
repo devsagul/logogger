@@ -19,6 +19,7 @@ import (
 
 type App struct {
 	store  storage.MetricsStorage
+	db     storage.MetricsStorage
 	Router *chi.Mux
 	sync   bool
 	dumper dumper.Dumper
@@ -264,7 +265,7 @@ func (app App) retrieveValueJSON(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (app App) ping(w http.ResponseWriter, r *http.Request) error {
-	err := app.store.Ping()
+	err := app.db.Ping()
 	if err != nil {
 		return err
 	}
@@ -315,6 +316,11 @@ func NewApp(
 
 func (app *App) WithDumper(d dumper.Dumper) *App {
 	app.dumper = d
+	return app
+}
+
+func (app *App) WithDB(db storage.MetricsStorage) *App {
+	app.db = db
 	return app
 }
 
