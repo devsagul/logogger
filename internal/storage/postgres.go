@@ -160,6 +160,7 @@ func (p *PostgresStorage) BulkPut(values []schema.Metrics) error {
 }
 
 func (p *PostgresStorage) Ping() error {
+	log.Println("Postgres ping called")
 	return p.db.Ping()
 }
 
@@ -168,6 +169,7 @@ func (p *PostgresStorage) Close() error {
 }
 
 func NewPostgresStorage(dsn string) (*PostgresStorage, error) {
+	log.Printf("Creating postgres connection from DSN %s", dsn)
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		return nil, err

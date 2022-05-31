@@ -53,6 +53,7 @@ func main() {
 	store := storage.NewMemStorage()
 	var db storage.MetricsStorage
 	if cfg.DatabaseDSN != "" {
+		log.Println("Initializing postgres database")
 		db, err = storage.NewPostgresStorage(cfg.DatabaseDSN)
 		if err != nil {
 			log.Fatalf("error during storage initialization: %s", err.Error())
