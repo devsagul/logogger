@@ -383,6 +383,32 @@ func TestApp_FaultyStorage(t *testing.T) {
 	}
 }
 
+func TestApp_Ping(t *testing.T) {
+	store := storage.NewMemStorage()
+	app := NewApp(store)
+
+	req, _ := http.NewRequest(http.MethodGet, "/ping", nil)
+	recorder := httptest.NewRecorder()
+	app.Router.ServeHTTP(recorder, req)
+
+	responseCode := recorder.Code
+
+	assert.Equal(t, 200, responseCode)
+}
+
+func TestApp_PingFaulty(t *testing.T) {
+	store := faultyStorage{}
+	app := NewApp(store)
+
+	req, _ := http.NewRequest(http.MethodGet, "/ping", nil)
+	recorder := httptest.NewRecorder()
+	app.Router.ServeHTTP(recorder, req)
+
+	responseCode := recorder.Code
+
+	assert.NotEqual(t, 200, responseCode)
+}
+
 /**
 Mocks used for specific tests
 */
@@ -412,7 +438,7 @@ func (faultyStorage) BulkPut([]schema.Metrics) error {
 }
 
 func (faultyStorage) Ping() error {
-	return nil
+	return errors.New("generic error")
 }
 
 func (faultyStorage) Close() error {
