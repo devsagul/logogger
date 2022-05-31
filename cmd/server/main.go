@@ -48,6 +48,7 @@ func main() {
 	if cfg.StoreInterval < 0 {
 		log.Fatal("Invalid value for store interval")
 	}
+	log.Printf("DSN: %v", cfg.DatabaseDSN)
 
 	store := storage.NewMemStorage()
 	var db storage.MetricsStorage
