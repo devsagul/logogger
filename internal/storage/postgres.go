@@ -72,7 +72,9 @@ func (p *PostgresStorage) Increment(req schema.Metrics, value int64) error {
 	}
 	defer func() {
 		err = tx.Rollback()
-		log.Printf("Error occured on Rollback: %s", err.Error())
+		if err != nil {
+			log.Printf("Error occured on Rollback: %s", err.Error())
+		}
 	}()
 
 	_, err = p.Extract(req)
@@ -99,7 +101,9 @@ func (p *PostgresStorage) List() ([]schema.Metrics, error) {
 	tx, err := p.db.Begin()
 	defer func() {
 		err := tx.Rollback()
-		log.Printf("Error occured on Rollback: %s", err.Error())
+		if err != nil {
+			log.Printf("Error occured on Rollback: %s", err.Error())
+		}
 	}()
 
 	if err != nil {
@@ -132,7 +136,9 @@ func (p *PostgresStorage) BulkPut(values []schema.Metrics) error {
 	}
 	defer func() {
 		err := tx.Rollback()
-		log.Printf("Error occured on Rollback: %s", err.Error())
+		if err != nil {
+			log.Printf("Error occured on Rollback: %s", err.Error())
+		}
 	}()
 	putQuery, err := p.db.Prepare("INSERT INTO metric(id, type, delta, value) VALUES(?, ?, ?, ?) ON CONFLICT DO UPDATE")
 	if err != nil {
