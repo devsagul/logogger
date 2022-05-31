@@ -321,11 +321,6 @@ func (app *App) WithDumper(d dumper.Dumper) *App {
 	return app
 }
 
-func (app *App) WithDB(db storage.MetricsStorage) *App {
-	app.db = db
-	return app
-}
-
 func (app *App) WithDumpInterval(interval time.Duration) *App {
 	if interval == 0 {
 		app.sync = true

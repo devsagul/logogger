@@ -50,16 +50,15 @@ func main() {
 	}
 	log.Printf("DSN: %v", cfg.DatabaseDSN)
 
-	store := storage.NewMemStorage()
-	var db storage.MetricsStorage
+	var store storage.MetricsStorage
 	if cfg.DatabaseDSN != "" {
 		log.Println("Initializing postgres database")
-		db, err = storage.NewPostgresStorage(cfg.DatabaseDSN)
+		store, err = storage.NewPostgresStorage(cfg.DatabaseDSN)
 		if err != nil {
 			log.Fatalf("error during storage initialization: %s", err.Error())
 		}
 	} else {
-		db = store
+		store = storage.NewMemStorage()
 	}
 	defer func() {
 		err = store.Close()
@@ -117,7 +116,7 @@ func main() {
 	}()
 
 	log.Println("Initializing application...")
-	app := server.NewApp(store).WithDumper(d).WithDumpInterval(cfg.StoreInterval).WithDB(db)
+	app := server.NewApp(store).WithDumper(d).WithDumpInterval(cfg.StoreInterval)
 	log.Println("Listening...")
 	err = http.ListenAndServe(cfg.Address, app.Router)
 	if err != nil {
