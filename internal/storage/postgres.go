@@ -160,7 +160,6 @@ func (p *PostgresStorage) BulkPut(values []schema.Metrics) error {
 }
 
 func (p *PostgresStorage) Ping() error {
-	log.Println("Postgres ping called")
 	return p.db.Ping()
 }
 
@@ -169,8 +168,12 @@ func (p *PostgresStorage) Close() error {
 }
 
 func NewPostgresStorage(dsn string) (*PostgresStorage, error) {
-	log.Printf("Creating postgres connection from DSN %s", dsn)
 	db, err := sql.Open("postgres", dsn)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = db.Exec("CREATE TABLE IF NOT EXISTS metric (id VARCHAR(255) PRIMARY KEY), type VARCHAR(255) NOT NULL, delta INTEGER, value DOUBLE PRECISION")
 	if err != nil {
 		return nil, err
 	}
