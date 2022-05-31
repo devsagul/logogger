@@ -21,7 +21,7 @@ func (p *PostgresStorage) Put(req schema.Metrics) error {
 		if err != nil {
 			return err
 		}
-		_, err = putQuery.Query(req.ID, *req.Delta)
+		_, err = putQuery.Exec(req.ID, *req.Delta)
 		if err != nil {
 			return err
 		}
@@ -30,7 +30,7 @@ func (p *PostgresStorage) Put(req schema.Metrics) error {
 		if err != nil {
 			return err
 		}
-		_, err = putQuery.Query(req.ID, *req.Value)
+		_, err = putQuery.Exec(req.ID, *req.Value)
 		if err != nil {
 			return err
 		}
@@ -121,7 +121,8 @@ func (p *PostgresStorage) List() ([]schema.Metrics, error) {
 		}
 		res = append(res, row)
 	}
-	return res, nil
+	err = rows.Err()
+	return res, err
 }
 
 func (p *PostgresStorage) BulkPut(values []schema.Metrics) error {
@@ -134,6 +135,9 @@ func (p *PostgresStorage) BulkPut(values []schema.Metrics) error {
 		log.Printf("Error occured on Rollback: %s", err.Error())
 	}()
 	putQuery, err := p.db.Prepare("INSERT INTO metric(id, type, delta, value) VALUES(?, ?, ?, ?) ON CONFLICT DO UPDATE")
+	if err != nil {
+		return err
+	}
 	for _, metric := range values {
 		switch metric.MType {
 		case "counter":
