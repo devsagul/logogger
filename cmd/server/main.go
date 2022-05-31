@@ -39,6 +39,7 @@ func init() {
 
 func main() {
 	log.Println("Initializing server...")
+	log.Printf("%v", os.Args)
 	flag.Parse()
 	err := env.Parse(&cfg)
 	if err != nil {
