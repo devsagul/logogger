@@ -410,3 +410,11 @@ func (faultyStorage) List() ([]schema.Metrics, error) {
 func (faultyStorage) BulkPut([]schema.Metrics) error {
 	return errors.New("generic error")
 }
+
+func (faultyStorage) Ping() error {
+	return nil
+}
+
+func (faultyStorage) Close() error {
+	return nil
+}

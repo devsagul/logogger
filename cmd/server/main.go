@@ -57,6 +57,12 @@ func main() {
 			log.Fatalf("error during storage initialization: %s", err.Error())
 		}
 	}
+	defer func() {
+		err = store.Close()
+		if err != nil {
+			log.Printf("Could not close the storage: %s", err.Error())
+		}
+	}()
 
 	// restore storage if needed
 	if cfg.Restore && cfg.DatabaseDSN != "" {
