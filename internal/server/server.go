@@ -266,6 +266,7 @@ func (app App) retrieveValueJSON(w http.ResponseWriter, r *http.Request) error {
 
 func (app App) ping(w http.ResponseWriter, r *http.Request) error {
 	err := app.db.Ping()
+	log.Printf("Ping result: %v", app.db.Ping())
 	if err != nil {
 		return err
 	}
