@@ -263,6 +263,15 @@ func (app App) retrieveValueJSON(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+func (app App) ping(w http.ResponseWriter, r *http.Request) error {
+	err := app.store.Ping()
+	if err != nil {
+		return err
+	}
+	SafeWrite(w, http.StatusOK, "Status: OK")
+	return nil
+}
+
 func (app *App) safeDump() {
 	log.Print("Dumping current storage state...")
 	l, err := app.store.List()
@@ -299,8 +308,8 @@ func NewApp(
 	r.With(middleware.SetHeader("Content-Type", "text/plain")).Get("/value/{Type}/{Name}", newHandler(app.retrieveValue))
 	r.With(middleware.SetHeader("Content-Type", "application/json")).Post("/update/", newHandler(app.updateValueJSON))
 	r.With(middleware.SetHeader("Content-Type", "application/json")).Post("/value/", newHandler(app.retrieveValueJSON))
+	r.With(middleware.SetHeader("Content-Type", "text/plain")).Get("/ping", newHandler(app.ping))
 	r.With(middleware.SetHeader("Content-Type", "text/html")).Get("/", newHandler(app.listMetrics))
-	// TODO add ping handler
 	return app
 }
 
