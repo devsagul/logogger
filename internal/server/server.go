@@ -39,7 +39,6 @@ func newHandler(handler errorHTTPHandler) http.HandlerFunc {
 
 		select {
 		case err := <-errChan:
-			log.Printf("ERROR: %v", err)
 			if err != nil {
 				WriteError(writer, err)
 			}
