@@ -18,23 +18,23 @@ func (p *PostgresStorage) Put(req schema.Metrics) error {
 	switch req.MType {
 	case "counter":
 		log.Println("prepare query")
-		putQuery, err := p.db.Prepare("INSERT INTO metric(id, type, delta, value) VALUES(?, 'counter', ?, NULL) ON CONFLICT DO UPDATE SET type='counter', delta=?, value=NULL")
+		putQuery, err := p.db.Prepare("INSERT INTO metric(id, type, delta, value) VALUES(?, 'counter', ?, NULL) ON CONFLICT DO UPDATE SET type='counter', delta=EXCLUDED.delta, value=NULL")
 		if err != nil {
 			return err
 		}
 		log.Println("exec query")
-		_, err = putQuery.Exec(req.ID, *req.Delta, *req.Delta)
+		_, err = putQuery.Exec(req.ID, *req.Delta)
 		if err != nil {
 			return err
 		}
 	case "gauge":
 		log.Println("prepare query")
-		putQuery, err := p.db.Prepare("INSERT INTO metric(id, type, delta, value) VALUES(?, 'gauge', NULL, ?) ON CONFLICT DO UPDATE SET type='gauge', delta=NULL, value=?")
+		putQuery, err := p.db.Prepare("INSERT INTO metric(id, type, delta, value) VALUES(?, 'gauge', NULL, ?) ON CONFLICT DO UPDATE SET type='gauge', delta=NULL, value=EXCLUDED.value")
 		if err != nil {
 			return err
 		}
 		log.Println("exec query")
-		_, err = putQuery.Exec(req.ID, *req.Value, *req.Value)
+		_, err = putQuery.Exec(req.ID, *req.Value)
 		if err != nil {
 			return err
 		}
