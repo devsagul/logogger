@@ -17,10 +17,12 @@ type PostgresStorage struct {
 func (p *PostgresStorage) Put(req schema.Metrics) error {
 	switch req.MType {
 	case "counter":
+		log.Println("prepare query")
 		putQuery, err := p.db.Prepare("DELETE FROM metric WHERE id = ?; INSERT INTO metric(id, type, delta, value) VALUES(?, 'counter', ?, NULL)")
 		if err != nil {
 			return err
 		}
+		log.Println("exec query")
 		_, err = putQuery.Exec(req.ID, req.ID, *req.Delta)
 		if err != nil {
 			return err
