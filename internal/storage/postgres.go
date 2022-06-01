@@ -28,10 +28,12 @@ func (p *PostgresStorage) Put(req schema.Metrics) error {
 			return err
 		}
 	case "gauge":
+		log.Println("prepare query")
 		putQuery, err := p.db.Prepare("DELETE FROM metric WHERE id = ?; INSERT INTO gauge(id, type, delta, value) VALUES(?, 'gauge', NULL, ?)")
 		if err != nil {
 			return err
 		}
+		log.Println("prepare query")
 		_, err = putQuery.Exec(req.ID, req.ID, *req.Value)
 		if err != nil {
 			return err
