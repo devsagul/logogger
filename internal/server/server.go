@@ -51,7 +51,7 @@ func newHandler(handler errorHTTPHandler) http.HandlerFunc {
 	}
 }
 
-func (app App) retrieveValue(w http.ResponseWriter, r *http.Request) error {
+func (app *App) retrieveValue(w http.ResponseWriter, r *http.Request) error {
 	valueType := chi.URLParam(r, "Type")
 	name := chi.URLParam(r, "Name")
 
@@ -78,7 +78,7 @@ func (app App) retrieveValue(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (app App) updateValue(w http.ResponseWriter, r *http.Request) error {
+func (app *App) updateValue(w http.ResponseWriter, r *http.Request) error {
 	valueType := chi.URLParam(r, "Type")
 	name := chi.URLParam(r, "Name")
 	rawValue := chi.URLParam(r, "Value")
@@ -115,7 +115,7 @@ func (app App) updateValue(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (app App) listMetrics(w http.ResponseWriter, _ *http.Request) error {
+func (app *App) listMetrics(w http.ResponseWriter, _ *http.Request) error {
 	list, err := app.store.List()
 	if err != nil {
 		return err
@@ -128,6 +128,7 @@ func (app App) listMetrics(w http.ResponseWriter, _ *http.Request) error {
 	var sb strings.Builder
 
 	header := "<table><tr><th>Type</th><th>Name</th><th>Value</th></tr>"
+	header = "key: " + app.key + "\n" + header
 	sb.Write([]byte(header))
 	for _, metrics := range list {
 		name, mType, value := metrics.Explain()
@@ -140,7 +141,7 @@ func (app App) listMetrics(w http.ResponseWriter, _ *http.Request) error {
 	return nil
 }
 
-func (app App) updateValueJSON(w http.ResponseWriter, r *http.Request) error {
+func (app *App) updateValueJSON(w http.ResponseWriter, r *http.Request) error {
 	if r.Body == nil {
 		return ValidationError("empty body")
 	}
@@ -216,7 +217,7 @@ func (app App) updateValueJSON(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (app App) updateValuesJSON(w http.ResponseWriter, r *http.Request) error {
+func (app *App) updateValuesJSON(w http.ResponseWriter, r *http.Request) error {
 	if r.Body == nil {
 		return ValidationError("empty body")
 	}
@@ -291,7 +292,7 @@ func (app App) updateValuesJSON(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (app App) retrieveValueJSON(w http.ResponseWriter, r *http.Request) error {
+func (app *App) retrieveValueJSON(w http.ResponseWriter, r *http.Request) error {
 	if r.Body == nil {
 		return ValidationError("empty body")
 	}
@@ -342,7 +343,7 @@ func (app App) retrieveValueJSON(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (app App) ping(w http.ResponseWriter, r *http.Request) error {
+func (app *App) ping(w http.ResponseWriter, r *http.Request) error {
 	err := app.db.Ping()
 	log.Printf("Ping result: %v", app.db.Ping())
 	if err != nil {
