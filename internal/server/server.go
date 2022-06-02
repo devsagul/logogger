@@ -284,6 +284,7 @@ func (app *App) updateValuesJSON(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	println(string(serialized))
 
 	SafeWrite(w, http.StatusOK, string(serialized))
 	if app.sync {
