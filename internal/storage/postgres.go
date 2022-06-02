@@ -197,6 +197,9 @@ func (p *PostgresStorage) BulkUpdate(counters []schema.Metrics, gauges []schema.
 	}()
 
 	putQuery, err := p.db.Prepare("INSERT INTO metric(id, type, delta, value) VALUES($1, 'counter', $2, NULL) ON CONFLICT (id) DO UPDATE SET type='counter', delta=delta+EXCLUDED.delta, value=NULL")
+	if err != nil {
+		return err
+	}
 	for _, m := range counters {
 		_, err = putQuery.Exec(m.ID, *m.Delta)
 		if err != nil {
@@ -205,6 +208,9 @@ func (p *PostgresStorage) BulkUpdate(counters []schema.Metrics, gauges []schema.
 	}
 
 	putQuery, err = p.db.Prepare("INSERT INTO metric(id, type, delta, value) VALUES($1, 'gauge', NULL, $2) ON CONFLICT (id) DO UPDATE SET type='gauge', delta=NULL, value=EXCLUDED.value")
+	if err != nil {
+		return err
+	}
 	for _, m := range gauges {
 		_, err = putQuery.Exec(m.ID, *m.Value)
 		if err != nil {
