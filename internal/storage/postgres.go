@@ -138,7 +138,15 @@ func (p *PostgresStorage) List() ([]schema.Metrics, error) {
 	}
 	for rows.Next() {
 		var row schema.Metrics
-		err = rows.Scan(&row.ID, &row.MType, row.Delta, row.Value)
+		var delta sql.NullInt64
+		var value sql.NullFloat64
+		err = rows.Scan(&row.ID, &row.MType, &delta, &value)
+		if delta.Valid {
+			row.Delta = &delta.Int64
+		}
+		if value.Valid {
+			row.Value = &value.Float64
+		}
 		if err != nil {
 			return res, err
 		}
