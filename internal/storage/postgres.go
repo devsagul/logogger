@@ -101,7 +101,7 @@ func (p *PostgresStorage) Increment(req schema.Metrics, value int64) error {
 		return err
 	}
 
-	incrementQuery, err := p.db.Prepare("UPDATE metric SET delta = delta + $1 WHERE id = $2")
+	incrementQuery, err := p.db.Prepare("UPDATE metric SET delta = delta + $2 WHERE id = $1")
 	if err != nil {
 		return err
 	}
