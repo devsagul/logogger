@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"golang.org/x/sync/errgroup"
 	"log"
 	"logogger/internal/poller"
 	"logogger/internal/reporter"
@@ -13,6 +12,8 @@ import (
 	"regexp"
 	"syscall"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/caarlos0/env/v6"
 )
