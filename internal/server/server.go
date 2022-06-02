@@ -284,7 +284,7 @@ func (app *App) updateValuesJSON(w http.ResponseWriter, r *http.Request) error {
 		Metrics []schema.Metrics
 	}
 
-	serialized, err := json.Marshal(Metrics{values})
+	serialized, err := json.Marshal(values[0])
 	if err != nil {
 		return err
 	}
