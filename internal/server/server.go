@@ -216,6 +216,81 @@ func (app App) updateValueJSON(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+func (app App) updateValuesJSON(w http.ResponseWriter, r *http.Request) error {
+	if r.Body == nil {
+		return ValidationError("empty body")
+	}
+
+	data, err := io.ReadAll(r.Body)
+	if err != nil {
+		return err
+	}
+
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+
+	var m []schema.Metrics
+	err = decoder.Decode(&m)
+	if err != nil {
+		return ValidationError(err.Error())
+	}
+
+	var counters []schema.Metrics
+	var gauges []schema.Metrics
+
+	for _, item := range m {
+		if app.key != "" {
+			signed, err := item.IsSignedWithKey(app.key)
+			if err != nil {
+				return err
+			}
+			if !signed {
+				return ValidationError("signature mismatch")
+			}
+		}
+		switch item.MType {
+		case "counter":
+			counters = append(counters, item)
+		case "gauge":
+			gauges = append(gauges, item)
+		default:
+			return &requestError{
+				status: http.StatusNotImplemented,
+				body:   fmt.Sprintf("Could not perform requested operation on metric type %s", item.MType),
+			}
+		}
+	}
+
+	err = app.store.BulkUpdate(counters, gauges)
+	if err != nil {
+		return err
+	}
+
+	values, err := app.store.List()
+	if err != nil {
+		return err
+	}
+
+	if app.key != "" {
+		for _, value := range values {
+			if err = value.Sign(app.key); err != nil {
+				return err
+			}
+		}
+	}
+
+	serialized, err := json.Marshal(values)
+	if err != nil {
+		return err
+	}
+
+	SafeWrite(w, http.StatusOK, string(serialized))
+	if app.sync {
+		go app.safeDump()
+	}
+	return nil
+}
+
 func (app App) retrieveValueJSON(w http.ResponseWriter, r *http.Request) error {
 	if r.Body == nil {
 		return ValidationError("empty body")
@@ -313,6 +388,7 @@ func NewApp(
 	r.With(middleware.SetHeader("Content-Type", "text/plain")).Post("/update/{Type}/{Name}/{Value}", newHandler(app.updateValue))
 	r.With(middleware.SetHeader("Content-Type", "text/plain")).Get("/value/{Type}/{Name}", newHandler(app.retrieveValue))
 	r.With(middleware.SetHeader("Content-Type", "application/json")).Post("/update/", newHandler(app.updateValueJSON))
+	r.With(middleware.SetHeader("Content-Type", "application/json")).Post("/updates/", newHandler(app.updateValuesJSON))
 	r.With(middleware.SetHeader("Content-Type", "application/json")).Post("/value/", newHandler(app.retrieveValueJSON))
 	r.With(middleware.SetHeader("Content-Type", "text/plain")).Get("/ping", newHandler(app.ping))
 	r.With(middleware.SetHeader("Content-Type", "text/html")).Get("/", newHandler(app.listMetrics))

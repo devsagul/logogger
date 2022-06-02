@@ -10,6 +10,7 @@ type MetricsStorage interface {
 	Increment(req schema.Metrics, value int64) error
 	List() ([]schema.Metrics, error)
 	BulkPut(values []schema.Metrics) error
+	BulkUpdate(counters []schema.Metrics, gauges []schema.Metrics) error
 	Ping() error
 	Close() error
 }

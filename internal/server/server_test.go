@@ -437,6 +437,10 @@ func (faultyStorage) BulkPut([]schema.Metrics) error {
 	return errors.New("generic error")
 }
 
+func (faultyStorage) BulkUpdate(counters []schema.Metrics, gauges []schema.Metrics) error {
+	return errors.New("generic error")
+}
+
 func (faultyStorage) Ping() error {
 	return errors.New("generic error")
 }

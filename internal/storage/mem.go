@@ -96,6 +96,23 @@ func (storage *MemStorage) BulkPut(values []schema.Metrics) error {
 	return nil
 }
 
+func (storage *MemStorage) BulkUpdate(counters []schema.Metrics, gauges []schema.Metrics) error {
+	storage.Lock()
+	defer storage.Unlock()
+	for _, counter := range counters {
+		prev, found := storage.m[counter.ID]
+		if found {
+			value := *prev.Delta + *counter.Delta
+			counter.Delta = &value
+		}
+		storage.m[counter.ID] = counter
+	}
+	for _, gauge := range gauges {
+		storage.m[gauge.ID] = gauge
+	}
+	return nil
+}
+
 func (*MemStorage) Ping() error {
 	return nil
 }

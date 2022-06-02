@@ -184,6 +184,39 @@ func (p *PostgresStorage) BulkPut(values []schema.Metrics) error {
 	return err
 }
 
+func (p *PostgresStorage) BulkUpdate(counters []schema.Metrics, gauges []schema.Metrics) error {
+	tx, err := p.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err := tx.Rollback()
+		if err != nil {
+			log.Printf("Error occured on Rollback: %s", err.Error())
+		}
+	}()
+	if err != nil {
+		return err
+	}
+
+	putQuery, err := p.db.Prepare("INSERT INTO metric(id, type, delta, value) VALUES($1, 'counter', $2, NULL) ON CONFLICT (id) DO UPDATE SET type='counter', delta=delta+EXCLUDED.delta, value=NULL")
+	for _, m := range counters {
+		_, err = putQuery.Exec(m.ID, *m.Delta)
+		if err != nil {
+			return err
+		}
+	}
+
+	putQuery, err = p.db.Prepare("INSERT INTO metric(id, type, delta, value) VALUES($1, 'gauge', NULL, $2) ON CONFLICT (id) DO UPDATE SET type='gauge', delta=NULL, value=EXCLUDED.value")
+	for _, m := range gauges {
+		_, err = putQuery.Exec(m.ID, *m.Value)
+		if err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 func (p *PostgresStorage) Ping() error {
 	return p.db.Ping()
 }
