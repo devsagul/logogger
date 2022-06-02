@@ -119,6 +119,6 @@ func report(l []schema.Metrics, host string, key string) error {
 		l = signed
 	}
 
-	err := reporter.ReportMetrics(l, host)
+	err := reporter.ReportMetricsBatches(l, host)
 	return err
 }

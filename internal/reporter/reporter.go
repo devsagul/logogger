@@ -73,6 +73,8 @@ func postBatchRequest(url string, l []schema.Metrics) (int, error) {
 		return 0, err
 	}
 	request.Header.Set("Content-Type", "application/json; charset=UTF-8")
+	request.Header.Set("Content-Encoding", "gzip")
+	request.Header.Set("Accept-Encoding", "gzip")
 
 	client := &http.Client{}
 	dur := time.Since(start)
@@ -93,6 +95,20 @@ func postBatchRequest(url string, l []schema.Metrics) (int, error) {
 }
 
 func ReportMetrics(l []schema.Metrics, host string) error {
+	eg := &errgroup.Group{}
+
+	for _, m := range l {
+		m := m
+		url := fmt.Sprintf("%s/update/", host)
+		eg.Go(func() error {
+			return postRequest(url, m)
+		})
+	}
+
+	return eg.Wait()
+}
+
+func ReportMetricsBatches(l []schema.Metrics, host string) error {
 	if batches {
 		if len(l) == 0 {
 			return nil
@@ -104,17 +120,6 @@ func ReportMetrics(l []schema.Metrics, host string) error {
 			return ReportMetrics(l, host)
 		}
 		return err
-	} else {
-		eg := &errgroup.Group{}
-
-		for _, m := range l {
-			m := m
-			url := fmt.Sprintf("%s/update/", host)
-			eg.Go(func() error {
-				return postRequest(url, m)
-			})
-		}
-
-		return eg.Wait()
 	}
+	return ReportMetrics(l, host)
 }
