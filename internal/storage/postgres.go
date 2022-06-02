@@ -195,9 +195,6 @@ func (p *PostgresStorage) BulkUpdate(counters []schema.Metrics, gauges []schema.
 			log.Printf("Error occured on Rollback: %s", err.Error())
 		}
 	}()
-	if err != nil {
-		return err
-	}
 
 	putQuery, err := p.db.Prepare("INSERT INTO metric(id, type, delta, value) VALUES($1, 'counter', $2, NULL) ON CONFLICT (id) DO UPDATE SET type='counter', delta=delta+EXCLUDED.delta, value=NULL")
 	for _, m := range counters {
