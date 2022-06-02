@@ -286,7 +286,7 @@ func (app *App) updateValuesJSON(w http.ResponseWriter, r *http.Request) error {
 	}
 	println(string(serialized))
 
-	SafeWrite(w, http.StatusOK, string(serialized))
+	SafeWrite(w, http.StatusOK, "[]")
 	if app.sync {
 		go app.safeDump()
 	}
