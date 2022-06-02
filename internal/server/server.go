@@ -128,7 +128,6 @@ func (app *App) listMetrics(w http.ResponseWriter, _ *http.Request) error {
 	var sb strings.Builder
 
 	header := "<table><tr><th>Type</th><th>Name</th><th>Value</th></tr>"
-	header = "key: " + app.key + "\n" + header
 	sb.Write([]byte(header))
 	for _, metrics := range list {
 		name, mType, value := metrics.Explain()

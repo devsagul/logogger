@@ -204,9 +204,6 @@ func (p *PostgresStorage) BulkUpdate(counters []schema.Metrics, gauges []schema.
 		}
 	}()
 
-	fmt.Printf("%v", counters)
-	fmt.Printf("%v", gauges)
-
 	putQuery, err := p.db.Prepare("INSERT INTO metric(id, type, delta, value) VALUES($1, 'counter', $2, NULL) ON CONFLICT (id) DO UPDATE SET type='counter', delta=metric.delta+EXCLUDED.delta, value=NULL")
 	if err != nil {
 		return err

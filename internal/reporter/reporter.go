@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"logogger/internal/schema"
 	"net/http"
@@ -74,6 +73,8 @@ func postBatchRequest(url string, l []schema.Metrics) (int, error) {
 		return 0, err
 	}
 	request.Header.Set("Content-Type", "application/json; charset=UTF-8")
+	request.Header.Set("Content-Encoding", "gzip")
+	request.Header.Set("Accept-Encoding", "gzip")
 
 	client := &http.Client{}
 	dur := time.Since(start)
@@ -82,14 +83,6 @@ func postBatchRequest(url string, l []schema.Metrics) (int, error) {
 		log.Printf("%s Got error after %dms: %s", id, dur.Milliseconds(), err.Error())
 		return 0, err
 	}
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
-	bodyString := string(bodyBytes)
-	fmt.Println("---body")
-	fmt.Println(string(bodyString))
-	fmt.Println("body---")
 	err = resp.Body.Close()
 	log.Printf("Got response after %dms", dur.Milliseconds())
 	code := resp.StatusCode
@@ -123,10 +116,12 @@ func ReportMetricsBatches(l []schema.Metrics, host string) error {
 		url := fmt.Sprintf("%s/updates/", host)
 		code, err := postBatchRequest(url, l)
 		if code == 404 {
+			// if the server can't handle /updates URL, we should
+			// use standard handle
 			batches = false
-			return ReportMetrics(l, host)
+		} else {
+			return err
 		}
-		return err
 	}
 	return ReportMetrics(l, host)
 }
