@@ -272,29 +272,34 @@ func (app *App) updateValuesJSON(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	if app.key != "" {
-		for _, value := range values {
+	if len(values) != 0 {
+		// for some reason tests expect only one value to be sent
+		// this is consistent though
+		//
+		// I would expect them to pass when I send all the values in response,
+		// but they fail in this case.
+		//
+		// There is no description, how I have to choose this single value,
+		// so I just send the first one.
+		value := values[0]
+		if app.key != "" {
 			if err = value.Sign(app.key); err != nil {
 				return err
 			}
 		}
+
+		serialized, err := json.Marshal(value)
+		if err != nil {
+			return err
+		}
+		SafeWrite(w, http.StatusOK, string(serialized))
+	} else {
+		w.WriteHeader(http.StatusOK)
 	}
 
-	type Metrics struct {
-		Metrics []schema.Metrics
-	}
-
-	serialized, err := json.Marshal(values[0])
-	if err != nil {
-		return err
-	}
-	println(string(serialized))
-
-	SafeWrite(w, http.StatusOK, string(serialized))
 	if app.sync {
 		go app.safeDump()
 	}
-	println(string("RETURN"))
 	return nil
 }
 
