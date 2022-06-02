@@ -73,6 +73,8 @@ func postBatchRequest(url string, l []schema.Metrics) (int, error) {
 		return 0, err
 	}
 	request.Header.Set("Content-Type", "application/json; charset=UTF-8")
+	request.Header.Set("Content-Encoding", "gzip")
+	request.Header.Set("Accept-Encoding", "gzip")
 
 	client := &http.Client{}
 	dur := time.Since(start)
