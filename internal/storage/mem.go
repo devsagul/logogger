@@ -23,11 +23,6 @@ type MemStorage struct {
 func (storage *MemStorage) Put(req schema.Metrics) error {
 	storage.Lock()
 	defer storage.Unlock()
-	cur, found := storage.m[req.ID]
-	if found && cur.MType != req.MType {
-		return typeMismatch(req.ID, req.MType, cur.MType)
-	}
-
 	storage.m[req.ID] = req
 	return nil
 }
@@ -48,7 +43,7 @@ func (storage *MemStorage) Extract(req schema.Metrics) (schema.Metrics, error) {
 }
 
 func (storage *MemStorage) Increment(req schema.Metrics, value int64) error {
-	if req.MType != "counter" {
+	if req.MType != schema.MetricsTypeCounter {
 		return incrementingNonCounterMetrics(req.ID, req.MType)
 	}
 
@@ -96,14 +91,33 @@ func (storage *MemStorage) BulkPut(values []schema.Metrics) error {
 	storage.Lock()
 	defer storage.Unlock()
 	for _, req := range values {
-		cur, found := storage.m[req.ID]
-		if found && cur.MType != req.MType {
-			return typeMismatch(req.ID, req.MType, cur.MType)
-		}
-
 		storage.m[req.ID] = req
-
 	}
+	return nil
+}
+
+func (storage *MemStorage) BulkUpdate(counters []schema.Metrics, gauges []schema.Metrics) error {
+	storage.Lock()
+	defer storage.Unlock()
+	for _, counter := range counters {
+		prev, found := storage.m[counter.ID]
+		if found {
+			value := *prev.Delta + *counter.Delta
+			counter.Delta = &value
+		}
+		storage.m[counter.ID] = counter
+	}
+	for _, gauge := range gauges {
+		storage.m[gauge.ID] = gauge
+	}
+	return nil
+}
+
+func (*MemStorage) Ping() error {
+	return nil
+}
+
+func (*MemStorage) Close() error {
 	return nil
 }
 

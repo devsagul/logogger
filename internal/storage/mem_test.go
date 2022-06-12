@@ -18,16 +18,6 @@ func TestMemStorage_PutSingle(t *testing.T) {
 	assert.Equal(t, err, nil)
 }
 
-func TestMemStorage_PutTypeMismatch(t *testing.T) {
-	storage := NewMemStorage()
-	_ = storage.Put(schema.NewCounter("generic", 42))
-
-	err := storage.Put(schema.NewGauge("generic", 13.37))
-
-	assert.Errorf(t, err, "Did not return error on mismatched types")
-	assert.IsType(t, &TypeMismatch{}, err)
-}
-
 func TestMemStorage_PutConcurrentSameKey(t *testing.T) {
 	// arrange
 	storage := NewMemStorage()
@@ -162,18 +152,6 @@ func TestMemStorage_IncrementEmpty(t *testing.T) {
 	err := storage.Increment(req, 42)
 
 	assert.Errorf(t, err, "Did not return error on attemnt to increment non-existing value")
-}
-
-func TestMemStorage_IncrementTypeMismatch(t *testing.T) {
-	storage := NewMemStorage()
-	gauge := schema.NewGauge("counter", 13.37)
-	req := schema.NewCounterRequest("counter")
-
-	_ = storage.Put(gauge)
-	err := storage.Increment(req, 42)
-
-	assert.Errorf(t, err, "Did not return error on trying to increment stored gauge")
-	assert.IsType(t, &TypeMismatch{}, err)
 }
 
 func TestMemStorage_IncrementConcurrentSameKey(t *testing.T) {

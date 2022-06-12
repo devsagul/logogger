@@ -49,14 +49,14 @@ func WriteError(w http.ResponseWriter, e error) {
 }
 
 func ParseMetric(valueType string, name string, rawValue string) (schema.Metrics, error) {
-	switch valueType {
-	case "counter":
+	switch schema.MetricsType(valueType) {
+	case schema.MetricsTypeCounter:
 		value, err := strconv.ParseInt(rawValue, 10, 64)
 		if err != nil {
 			return schema.NewEmptyMetrics(), ValidationError(fmt.Sprintf("Could not parse int from %s", rawValue))
 		}
 		return schema.NewCounter(name, value), nil
-	case "gauge":
+	case schema.MetricsTypeGauge:
 		value, err := strconv.ParseFloat(rawValue, 64)
 		if err != nil {
 			return schema.NewEmptyMetrics(), ValidationError(fmt.Sprintf("Could not parse float from %s", rawValue))

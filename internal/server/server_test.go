@@ -17,24 +17,26 @@ import (
 
 func TestApp_RetrieveValue(t *testing.T) {
 	store := storage.NewMemStorage()
-	_ = store.Put(schema.NewCounter("ctrID", 42))
+	err := store.Put(schema.NewCounter("ctrID", 42))
+	assert.NoError(t, err)
 	app := NewApp(store)
 
 	params := []struct {
-		t     string
+		t     schema.MetricsType
 		id    string
 		code  int
 		body  string
 		exact bool
 	}{
-		{"counter", "ctrID", http.StatusOK, "42", true},
-		{"gauge", "ctrID", http.StatusConflict, "actual type in storage is counter", false},
-		{"counter", "nonExistent", http.StatusNotFound, "Could not find metrics", false},
+		{schema.MetricsTypeCounter, "ctrID", http.StatusOK, "42", true},
+		{schema.MetricsTypeGauge, "ctrID", http.StatusConflict, "actual type in storage is counter", false},
+		{schema.MetricsTypeCounter, "nonExistent", http.StatusNotFound, "Could not find metrics", false},
 		{"stats", "nonExistent", http.StatusNotImplemented, "Could not perform requested operation", false},
 	}
 	for _, param := range params {
 		url := fmt.Sprintf("/value/%s/%s", param.t, param.id)
-		req, _ := http.NewRequest(http.MethodGet, url, nil)
+		req, err := http.NewRequest(http.MethodGet, url, nil)
+		assert.NoError(t, err)
 		recorder := httptest.NewRecorder()
 		app.Router.ServeHTTP(recorder, req)
 		responseCode := recorder.Code
@@ -51,35 +53,40 @@ func TestApp_RetrieveValue(t *testing.T) {
 
 func TestApp_UpdateValue(t *testing.T) {
 	store := storage.NewMemStorage()
-	_ = store.Put(schema.NewGauge("ggID", 13.37))
-	_ = store.Put(schema.NewCounter("ctrID", 42))
+	err := store.Put(schema.NewGauge("ggID", 13.37))
+	assert.NoError(t, err)
+	err = store.Put(schema.NewCounter("ctrID", 42))
+	assert.NoError(t, err)
 	app := NewApp(store)
 
 	params := []struct {
-		t     string
+		t     schema.MetricsType
 		id    string
 		v     string
 		value float64
 		delta int64
 	}{
-		{"gauge", "ggID", "4.99", 4.99, 0},
-		{"gauge", "newGaugeId", "13.37", 13.37, 0},
-		{"counter", "cnrID", "1", 0, 1},
-		{"counter", "newCnrID", "1337", 0, 1337},
+		{schema.MetricsTypeGauge, "ggID", "4.99", 4.99, 0},
+		{schema.MetricsTypeGauge, "newGaugeId", "13.37", 13.37, 0},
+		{schema.MetricsTypeCounter, "cnrID", "1", 0, 1},
+		{schema.MetricsTypeCounter, "newCnrID", "1337", 0, 1337},
 	}
 	for _, param := range params {
 		url := fmt.Sprintf("/update/%s/%s/%s", param.t, param.id, param.v)
-		req, _ := http.NewRequest(http.MethodPost, url, nil)
+		req, err := http.NewRequest(http.MethodPost, url, nil)
+		assert.NoError(t, err)
 		recorder := httptest.NewRecorder()
 		app.Router.ServeHTTP(recorder, req)
 		responseCode := recorder.Code
 		body := recorder.Body.String()
 		if param.t == "gauge" {
-			stored, _ := store.Extract(schema.NewGaugeRequest(param.id))
+			stored, err := store.Extract(schema.NewGaugeRequest(param.id))
+			assert.NoError(t, err)
 			actual := *stored.Value
 			assert.Equal(t, param.value, actual)
 		} else {
-			stored, _ := store.Extract(schema.NewCounterRequest(param.id))
+			stored, err := store.Extract(schema.NewCounterRequest(param.id))
+			assert.NoError(t, err)
 			actual := *stored.Delta
 			assert.Equal(t, param.delta, actual)
 		}
@@ -94,7 +101,8 @@ func TestApp_UpdateValueWrongType(t *testing.T) {
 	app := NewApp(store)
 
 	url := "/update/stats/ID/42"
-	req, _ := http.NewRequest(http.MethodPost, url, nil)
+	req, err := http.NewRequest(http.MethodPost, url, nil)
+	assert.NoError(t, err)
 	recorder := httptest.NewRecorder()
 	app.Router.ServeHTTP(recorder, req)
 	responseCode := recorder.Code
@@ -106,7 +114,8 @@ func TestApp_UpdateValueWrongType(t *testing.T) {
 
 func TestApp_ListMetricsEmpty(t *testing.T) {
 	app := NewApp(storage.NewMemStorage())
-	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	req, err := http.NewRequest(http.MethodGet, "/", nil)
+	assert.NoError(t, err)
 	recorder := httptest.NewRecorder()
 
 	app.Router.ServeHTTP(recorder, req)
@@ -119,20 +128,23 @@ func TestApp_ListMetricsEmpty(t *testing.T) {
 
 func TestApp_ListMetrics(t *testing.T) {
 	store := storage.NewMemStorage()
-	_ = store.Put(schema.NewCounter("ctrID", 42))
-	_ = store.Put(schema.NewGauge("ggID", 13.37))
+	err := store.Put(schema.NewCounter("ctrID", 42))
+	assert.NoError(t, err)
+	err = store.Put(schema.NewGauge("ggID", 13.37))
+	assert.NoError(t, err)
 	app := NewApp(store)
-	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	req, err := http.NewRequest(http.MethodGet, "/", nil)
+	assert.NoError(t, err)
 	recorder := httptest.NewRecorder()
 
 	app.Router.ServeHTTP(recorder, req)
 	responseCode := recorder.Code
 	body := recorder.Body.String()
 
-	assert.Contains(t, body, "counter")
+	assert.Contains(t, body, schema.MetricsTypeCounter)
 	assert.Contains(t, body, "ctrID")
 	assert.Contains(t, body, "42")
-	assert.Contains(t, body, "gauge")
+	assert.Contains(t, body, schema.MetricsTypeGauge)
 	assert.Contains(t, body, "ggID")
 	assert.Contains(t, body, "13.37")
 	assert.Equal(t, http.StatusOK, responseCode)
@@ -142,7 +154,8 @@ func TestApp_UpdateValueJsonNoInput(t *testing.T) {
 	store := storage.NewMemStorage()
 	app := NewApp(store)
 
-	req, _ := http.NewRequest(http.MethodPost, "/update/", nil)
+	req, err := http.NewRequest(http.MethodPost, "/update/", nil)
+	assert.NoError(t, err)
 	recorder := httptest.NewRecorder()
 	app.Router.ServeHTTP(recorder, req)
 
@@ -168,7 +181,8 @@ func TestApp_UpdateValueJsonInvalidInput(t *testing.T) {
 
 	for _, data := range tests {
 		body := bytes.NewBufferString(data)
-		req, _ := http.NewRequest(http.MethodPost, "/update/", body)
+		req, err := http.NewRequest(http.MethodPost, "/update/", body)
+		assert.NoError(t, err)
 		recorder := httptest.NewRecorder()
 		app.Router.ServeHTTP(recorder, req)
 
@@ -207,9 +221,11 @@ func TestApp_UpdateValueJson(t *testing.T) {
 	}
 
 	for _, param := range params {
-		serialized, _ := json.Marshal(param.data)
+		serialized, err := json.Marshal(param.data)
+		assert.NoError(t, err)
 		body := bytes.NewBuffer(serialized)
-		req, _ := http.NewRequest(http.MethodPost, "/update/", body)
+		req, err := http.NewRequest(http.MethodPost, "/update/", body)
+		assert.NoError(t, err)
 		recorder := httptest.NewRecorder()
 		app.Router.ServeHTTP(recorder, req)
 
@@ -219,16 +235,17 @@ func TestApp_UpdateValueJson(t *testing.T) {
 
 		var actual schema.Metrics
 		decoder := json.NewDecoder(recorder.Body)
-		_ = decoder.Decode(&actual)
+		err = decoder.Decode(&actual)
+		assert.NoError(t, err)
 		contentType := recorder.Header().Get("Content-Type")
 
 		assert.Equal(t, http.StatusOK, responseCode)
 		assert.Equal(t, expected.ID, actual.ID)
 		assert.Equal(t, expected.MType, actual.MType)
 		switch expected.MType {
-		case "counter":
+		case schema.MetricsTypeCounter:
 			assert.Equal(t, *expected.Delta, *actual.Delta)
-		case "gauge":
+		case schema.MetricsTypeGauge:
 			assert.Equal(t, *expected.Value, *actual.Value)
 		}
 		assert.Equal(t, "application/json", contentType)
@@ -244,9 +261,11 @@ func TestApp_UpdateValueJSON_WrongType(t *testing.T) {
 		ID: "id", MType: "statistics", Delta: &d, Value: &f,
 	}
 
-	serialized, _ := json.Marshal(m)
+	serialized, err := json.Marshal(m)
+	assert.NoError(t, err)
 	body := bytes.NewBuffer(serialized)
-	req, _ := http.NewRequest(http.MethodPost, "/update/", body)
+	req, err := http.NewRequest(http.MethodPost, "/update/", body)
+	assert.NoError(t, err)
 	recorder := httptest.NewRecorder()
 	app.Router.ServeHTTP(recorder, req)
 
@@ -261,7 +280,8 @@ func TestApp_RetrieveValueJSONNoInput(t *testing.T) {
 	store := storage.NewMemStorage()
 	app := NewApp(store)
 
-	req, _ := http.NewRequest(http.MethodPost, "/value/", nil)
+	req, err := http.NewRequest(http.MethodPost, "/value/", nil)
+	assert.NoError(t, err)
 	recorder := httptest.NewRecorder()
 	app.Router.ServeHTTP(recorder, req)
 
@@ -284,7 +304,8 @@ func TestApp_RetrieveValueJSONInvalidInput(t *testing.T) {
 
 	for _, data := range tests {
 		body := bytes.NewBufferString(data)
-		req, _ := http.NewRequest(http.MethodPost, "/value/", body)
+		req, err := http.NewRequest(http.MethodPost, "/value/", body)
+		assert.NoError(t, err)
 		recorder := httptest.NewRecorder()
 		app.Router.ServeHTTP(recorder, req)
 
@@ -301,8 +322,10 @@ func TestApp_RetrieveValueJSON(t *testing.T) {
 	app := NewApp(store)
 
 	m := schema.NewCounter("ctrID", 42)
-	marshalled, _ := json.Marshal(m)
-	_ = store.Put(m)
+	marshalled, err := json.Marshal(m)
+	assert.NoError(t, err)
+	err = store.Put(m)
+	assert.NoError(t, err)
 
 	params := [...]struct {
 		request schema.Metrics
@@ -315,9 +338,11 @@ func TestApp_RetrieveValueJSON(t *testing.T) {
 	}
 
 	for _, param := range params {
-		serialized, _ := json.Marshal(param.request)
+		serialized, err := json.Marshal(param.request)
+		assert.NoError(t, err)
 		body := bytes.NewBuffer(serialized)
-		req, _ := http.NewRequest(http.MethodPost, "/value/", body)
+		req, err := http.NewRequest(http.MethodPost, "/value/", body)
+		assert.NoError(t, err)
 		recorder := httptest.NewRecorder()
 		app.Router.ServeHTTP(recorder, req)
 
@@ -336,9 +361,11 @@ func TestApp_RetrieveValueJSONWrongType(t *testing.T) {
 		ID: "id", MType: "statistics",
 	}
 
-	serialized, _ := json.Marshal(m)
+	serialized, err := json.Marshal(m)
+	assert.NoError(t, err)
 	body := bytes.NewBuffer(serialized)
-	req, _ := http.NewRequest(http.MethodPost, "/value/", body)
+	req, err := http.NewRequest(http.MethodPost, "/value/", body)
+	assert.NoError(t, err)
 	recorder := httptest.NewRecorder()
 	app.Router.ServeHTTP(recorder, req)
 
@@ -371,7 +398,8 @@ func TestApp_FaultyStorage(t *testing.T) {
 		} else {
 			reqBody = bytes.NewBufferString(param.body)
 		}
-		req, _ := http.NewRequest(param.method, param.url, reqBody)
+		req, err := http.NewRequest(param.method, param.url, reqBody)
+		assert.NoError(t, err)
 		recorder := httptest.NewRecorder()
 		app.Router.ServeHTTP(recorder, req)
 
@@ -381,6 +409,34 @@ func TestApp_FaultyStorage(t *testing.T) {
 		assert.Equal(t, http.StatusInternalServerError, responseCode)
 		assert.Contains(t, body, "Internal Server Error")
 	}
+}
+
+func TestApp_Ping(t *testing.T) {
+	store := storage.NewMemStorage()
+	app := NewApp(store)
+
+	req, err := http.NewRequest(http.MethodGet, "/ping", nil)
+	assert.NoError(t, err)
+	recorder := httptest.NewRecorder()
+	app.Router.ServeHTTP(recorder, req)
+
+	responseCode := recorder.Code
+
+	assert.Equal(t, http.StatusOK, responseCode)
+}
+
+func TestApp_PingFaulty(t *testing.T) {
+	store := faultyStorage{}
+	app := NewApp(store)
+
+	req, err := http.NewRequest(http.MethodGet, "/ping", nil)
+	assert.NoError(t, err)
+	recorder := httptest.NewRecorder()
+	app.Router.ServeHTTP(recorder, req)
+
+	responseCode := recorder.Code
+
+	assert.NotEqual(t, http.StatusOK, responseCode)
 }
 
 /**
@@ -409,4 +465,16 @@ func (faultyStorage) List() ([]schema.Metrics, error) {
 
 func (faultyStorage) BulkPut([]schema.Metrics) error {
 	return errors.New("generic error")
+}
+
+func (faultyStorage) BulkUpdate(counters []schema.Metrics, gauges []schema.Metrics) error {
+	return errors.New("generic error")
+}
+
+func (faultyStorage) Ping() error {
+	return errors.New("generic error")
+}
+
+func (faultyStorage) Close() error {
+	return nil
 }

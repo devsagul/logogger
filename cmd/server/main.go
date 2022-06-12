@@ -22,6 +22,8 @@ type config struct {
 	StoreInterval time.Duration `env:"STORE_INTERVAL"`
 	StoreFile     string        `env:"STORE_FILE"`
 	Restore       bool          `env:"RESTORE"`
+	Key           string        `env:"KEY"`
+	DatabaseDSN   string        `env:"DATABASE_DSN"`
 }
 
 var cfg config
@@ -31,10 +33,13 @@ func init() {
 	flag.DurationVar(&cfg.StoreInterval, "i", 300*time.Second, "Interval for storage state to be dumped on disk")
 	flag.StringVar(&cfg.StoreFile, "f", "/tmp/devops-metrics-db.json", "Path to the file for dumping storage state")
 	flag.BoolVar(&cfg.Restore, "r", true, "Restore store state from dump file on server initialization")
+	flag.StringVar(&cfg.Key, "k", "", "Secret key to sign metrics (should be shared between server and agent)")
+	flag.StringVar(&cfg.DatabaseDSN, "d", "", "Database connection string")
 }
 
 func main() {
 	log.Println("Initializing server...")
+	log.Printf("%v", os.Args)
 	flag.Parse()
 	err := env.Parse(&cfg)
 	if err != nil {
@@ -43,11 +48,27 @@ func main() {
 	if cfg.StoreInterval < 0 {
 		log.Fatal("Invalid value for store interval")
 	}
+	log.Printf("DSN: %v", cfg.DatabaseDSN)
 
-	store := storage.NewMemStorage()
+	var store storage.MetricsStorage
+	if cfg.DatabaseDSN != "" {
+		log.Println("Initializing postgres database")
+		store, err = storage.NewPostgresStorage(cfg.DatabaseDSN)
+		if err != nil {
+			log.Fatalf("error during storage initialization: %s", err.Error())
+		}
+	} else {
+		store = storage.NewMemStorage()
+	}
+	defer func() {
+		err = store.Close()
+		if err != nil {
+			log.Printf("Could not close the storage: %s", err.Error())
+		}
+	}()
 
 	// restore storage if needed
-	if cfg.Restore {
+	if cfg.Restore && cfg.DatabaseDSN == "" {
 		log.Println("Restoring storage from file...")
 		func() {
 			f, err := os.OpenFile(cfg.StoreFile, os.O_RDONLY|os.O_CREATE, 0644)
@@ -95,7 +116,7 @@ func main() {
 	}()
 
 	log.Println("Initializing application...")
-	app := server.NewApp(store).WithDumper(d).WithDumpInterval(cfg.StoreInterval)
+	app := server.NewApp(store).WithDumper(d).WithDumpInterval(cfg.StoreInterval).WithKey(cfg.Key)
 	log.Println("Listening...")
 	err = http.ListenAndServe(cfg.Address, app.Router)
 	if err != nil {
