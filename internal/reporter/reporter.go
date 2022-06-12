@@ -50,7 +50,7 @@ func postRequest(url string, m schema.Metrics) error {
 	log.Printf("Got response after %dms", dur.Milliseconds())
 	if err == nil {
 		code := resp.StatusCode
-		if code != 200 {
+		if code != http.StatusOK {
 			return fmt.Errorf("%s server returned %d code", id, code)
 		}
 	}
@@ -87,7 +87,7 @@ func postBatchRequest(url string, l []schema.Metrics) (int, error) {
 	log.Printf("Got response after %dms", dur.Milliseconds())
 	code := resp.StatusCode
 	if err == nil {
-		if code != 200 {
+		if code != http.StatusOK {
 			return code, fmt.Errorf("%s server returned %d code", id, code)
 		}
 	}
@@ -115,7 +115,7 @@ func ReportMetricsBatches(l []schema.Metrics, host string) error {
 		}
 		url := fmt.Sprintf("%s/updates/", host)
 		code, err := postBatchRequest(url, l)
-		if code == 404 {
+		if code == http.StatusNotFound {
 			// if the server can't handle /updates URL, we should
 			// use standard handle
 			batches = false

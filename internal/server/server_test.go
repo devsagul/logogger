@@ -393,7 +393,7 @@ func TestApp_Ping(t *testing.T) {
 
 	responseCode := recorder.Code
 
-	assert.Equal(t, 200, responseCode)
+	assert.Equal(t, http.StatusOK, responseCode)
 }
 
 func TestApp_PingFaulty(t *testing.T) {
@@ -406,7 +406,7 @@ func TestApp_PingFaulty(t *testing.T) {
 
 	responseCode := recorder.Code
 
-	assert.NotEqual(t, 200, responseCode)
+	assert.NotEqual(t, http.StatusOK, responseCode)
 }
 
 /**
