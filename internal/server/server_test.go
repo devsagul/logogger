@@ -21,15 +21,15 @@ func TestApp_RetrieveValue(t *testing.T) {
 	app := NewApp(store)
 
 	params := []struct {
-		t     string
+		t     schema.MetricsType
 		id    string
 		code  int
 		body  string
 		exact bool
 	}{
-		{"counter", "ctrID", http.StatusOK, "42", true},
-		{"gauge", "ctrID", http.StatusConflict, "actual type in storage is counter", false},
-		{"counter", "nonExistent", http.StatusNotFound, "Could not find metrics", false},
+		{schema.MetricsTypeCounter, "ctrID", http.StatusOK, "42", true},
+		{schema.MetricsTypeGauge, "ctrID", http.StatusConflict, "actual type in storage is counter", false},
+		{schema.MetricsTypeCounter, "nonExistent", http.StatusNotFound, "Could not find metrics", false},
 		{"stats", "nonExistent", http.StatusNotImplemented, "Could not perform requested operation", false},
 	}
 	for _, param := range params {
@@ -56,16 +56,16 @@ func TestApp_UpdateValue(t *testing.T) {
 	app := NewApp(store)
 
 	params := []struct {
-		t     string
+		t     schema.MetricsType
 		id    string
 		v     string
 		value float64
 		delta int64
 	}{
-		{"gauge", "ggID", "4.99", 4.99, 0},
-		{"gauge", "newGaugeId", "13.37", 13.37, 0},
-		{"counter", "cnrID", "1", 0, 1},
-		{"counter", "newCnrID", "1337", 0, 1337},
+		{schema.MetricsTypeGauge, "ggID", "4.99", 4.99, 0},
+		{schema.MetricsTypeGauge, "newGaugeId", "13.37", 13.37, 0},
+		{schema.MetricsTypeCounter, "cnrID", "1", 0, 1},
+		{schema.MetricsTypeCounter, "newCnrID", "1337", 0, 1337},
 	}
 	for _, param := range params {
 		url := fmt.Sprintf("/update/%s/%s/%s", param.t, param.id, param.v)
@@ -129,10 +129,10 @@ func TestApp_ListMetrics(t *testing.T) {
 	responseCode := recorder.Code
 	body := recorder.Body.String()
 
-	assert.Contains(t, body, "counter")
+	assert.Contains(t, body, schema.MetricsTypeCounter)
 	assert.Contains(t, body, "ctrID")
 	assert.Contains(t, body, "42")
-	assert.Contains(t, body, "gauge")
+	assert.Contains(t, body, schema.MetricsTypeGauge)
 	assert.Contains(t, body, "ggID")
 	assert.Contains(t, body, "13.37")
 	assert.Equal(t, http.StatusOK, responseCode)
@@ -226,9 +226,9 @@ func TestApp_UpdateValueJson(t *testing.T) {
 		assert.Equal(t, expected.ID, actual.ID)
 		assert.Equal(t, expected.MType, actual.MType)
 		switch expected.MType {
-		case "counter":
+		case schema.MetricsTypeCounter:
 			assert.Equal(t, *expected.Delta, *actual.Delta)
-		case "gauge":
+		case schema.MetricsTypeGauge:
 			assert.Equal(t, *expected.Value, *actual.Value)
 		}
 		assert.Equal(t, "application/json", contentType)

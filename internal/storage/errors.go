@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"logogger/internal/schema"
 )
 
 type NotFound struct {
@@ -26,9 +27,9 @@ func (err *IncrementingNonCounterMetrics) Error() string {
 	return err.wrapped.Error()
 }
 
-func incrementingNonCounterMetrics(key string, actualType string) *IncrementingNonCounterMetrics {
+func incrementingNonCounterMetrics(key string, actualType schema.MetricsType) *IncrementingNonCounterMetrics {
 	return &IncrementingNonCounterMetrics{
-		fmt.Errorf("could not increment value %s, currently it's holding value of type %s", key, actualType), actualType,
+		fmt.Errorf("could not increment value %s, currently it's holding value of type %s", key, actualType), string(actualType),
 	}
 }
 
@@ -43,6 +44,6 @@ func (err *TypeMismatch) Error() string {
 	return err.wrapped.Error()
 }
 
-func typeMismatch(key string, requestedType string, storedType string) *TypeMismatch {
-	return &TypeMismatch{fmt.Errorf("expected value of type %s but got %s", requestedType, storedType), key, requestedType, storedType}
+func typeMismatch(key string, requestedType schema.MetricsType, storedType schema.MetricsType) *TypeMismatch {
+	return &TypeMismatch{fmt.Errorf("expected value of type %s but got %s", requestedType, storedType), key, string(requestedType), string(storedType)}
 }

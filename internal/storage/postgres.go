@@ -16,7 +16,7 @@ type PostgresStorage struct {
 
 func (p *PostgresStorage) Put(req schema.Metrics) error {
 	switch req.MType {
-	case "counter":
+	case schema.MetricsTypeCounter:
 		log.Println("prepare query")
 		putQuery, err := p.db.Prepare("INSERT INTO metric(id, type, delta, value) VALUES($1, 'counter', $2, NULL) ON CONFLICT (id) DO UPDATE SET type='counter', delta=EXCLUDED.delta, value=NULL")
 		if err != nil {
@@ -27,7 +27,7 @@ func (p *PostgresStorage) Put(req schema.Metrics) error {
 		if err != nil {
 			return err
 		}
-	case "gauge":
+	case schema.MetricsTypeGauge:
 		log.Println("prepare query")
 		putQuery, err := p.db.Prepare("INSERT INTO metric(id, type, delta, value) VALUES($1, 'gauge', NULL, $2) ON CONFLICT (id) DO UPDATE SET type='gauge', delta=NULL, value=EXCLUDED.value")
 		if err != nil {
@@ -173,12 +173,12 @@ func (p *PostgresStorage) BulkPut(values []schema.Metrics) error {
 	}
 	for _, metric := range values {
 		switch metric.MType {
-		case "counter":
+		case schema.MetricsTypeCounter:
 			_, err = putQuery.Exec(metric.ID, metric.MType, *metric.Delta, nil)
 			if err != nil {
 				return err
 			}
-		case "gauge":
+		case schema.MetricsTypeGauge:
 			_, err = putQuery.Exec(metric.ID, metric.MType, nil, *metric.Value)
 			if err != nil {
 				return err

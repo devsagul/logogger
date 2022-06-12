@@ -43,7 +43,7 @@ func (storage *MemStorage) Extract(req schema.Metrics) (schema.Metrics, error) {
 }
 
 func (storage *MemStorage) Increment(req schema.Metrics, value int64) error {
-	if req.MType != "counter" {
+	if req.MType != schema.MetricsTypeCounter {
 		return incrementingNonCounterMetrics(req.ID, req.MType)
 	}
 

@@ -56,10 +56,10 @@ func (app *App) retrieveValue(w http.ResponseWriter, r *http.Request) error {
 	name := chi.URLParam(r, "Name")
 
 	var req schema.Metrics
-	switch valueType {
-	case "counter":
+	switch schema.MetricsType(valueType) {
+	case schema.MetricsTypeCounter:
 		req = schema.NewCounterRequest(name)
-	case "gauge":
+	case schema.MetricsTypeGauge:
 		req = schema.NewGaugeRequest(name)
 	default:
 		return &requestError{
@@ -159,7 +159,7 @@ func (app *App) updateValueJSON(w http.ResponseWriter, r *http.Request) error {
 		return ValidationError(err.Error())
 	}
 
-	if m.MType == "counter" && m.Delta == nil || m.MType == "gauge" && m.Value == nil {
+	if m.MType == schema.MetricsTypeCounter && m.Delta == nil || m.MType == schema.MetricsTypeGauge && m.Value == nil {
 		return ValidationError("Missing Value")
 	}
 
@@ -174,13 +174,13 @@ func (app *App) updateValueJSON(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	switch m.MType {
-	case "counter":
+	case schema.MetricsTypeCounter:
 		err = app.store.Increment(m, *m.Delta)
 		switch err.(type) {
 		case *storage.NotFound:
 			err = app.store.Put(m)
 		}
-	case "gauge":
+	case schema.MetricsTypeGauge:
 		err = app.store.Put(m)
 	default:
 		return &requestError{
@@ -249,9 +249,9 @@ func (app *App) updateValuesJSON(w http.ResponseWriter, r *http.Request) error {
 			}
 		}
 		switch item.MType {
-		case "counter":
+		case schema.MetricsTypeCounter:
 			counters = append(counters, item)
-		case "gauge":
+		case schema.MetricsTypeGauge:
 			gauges = append(gauges, item)
 		default:
 			return &requestError{
@@ -323,8 +323,8 @@ func (app *App) retrieveValueJSON(w http.ResponseWriter, r *http.Request) error 
 
 	var value schema.Metrics
 	switch m.MType {
-	case "counter":
-	case "gauge":
+	case schema.MetricsTypeCounter:
+	case schema.MetricsTypeGauge:
 	default:
 		return &requestError{
 			status: http.StatusNotImplemented,

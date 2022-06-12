@@ -9,47 +9,55 @@ import (
 )
 
 type Metrics struct {
-	ID    string   `json:"id"`
-	MType string   `json:"type"`
-	Delta *int64   `json:"delta,omitempty"`
-	Value *float64 `json:"value,omitempty"`
-	Hash  string   `json:"hash,omitempty"`
+	ID    string      `json:"id"`
+	MType MetricsType `json:"type"`
+	Delta *int64      `json:"delta,omitempty"`
+	Value *float64    `json:"value,omitempty"`
+	Hash  string      `json:"hash,omitempty"`
 }
 
+type MetricsType string
+
+const (
+	MetricsTypeCounter MetricsType = "counter"
+	MetricsTypeGauge   MetricsType = "gauge"
+	MetricsTypeEmpty   MetricsType = ""
+)
+
 func NewEmptyMetrics() Metrics {
-	return Metrics{"", "", nil, nil, ""}
+	return Metrics{"", MetricsTypeEmpty, nil, nil, ""}
 }
 
 func NewCounterRequest(id string) Metrics {
-	return Metrics{ID: id, MType: "counter"}
+	return Metrics{ID: id, MType: MetricsTypeCounter}
 }
 
 func NewGaugeRequest(id string) Metrics {
-	return Metrics{ID: id, MType: "gauge"}
+	return Metrics{ID: id, MType: MetricsTypeGauge}
 }
 
 func NewCounter(id string, delta int64) Metrics {
-	return Metrics{ID: id, MType: "counter", Delta: &delta}
+	return Metrics{ID: id, MType: MetricsTypeCounter, Delta: &delta}
 }
 
 func NewGauge(id string, value float64) Metrics {
-	return Metrics{ID: id, MType: "gauge", Value: &value}
+	return Metrics{ID: id, MType: MetricsTypeGauge, Value: &value}
 }
 
 func (m Metrics) Explain() (string, string, string) {
 	value := "(nil)"
 	switch m.MType {
-	case "counter":
+	case MetricsTypeCounter:
 		if m.Delta != nil {
 			value = fmt.Sprintf("%d", *m.Delta)
 		}
-	case "gauge":
+	case MetricsTypeGauge:
 		if m.Value != nil {
 			value = strconv.FormatFloat(*m.Value, 'f', -1, 64)
 		}
 	default:
 	}
-	return m.ID, m.MType, value
+	return m.ID, string(m.MType), value
 }
 
 type hashingMetricsError struct {
@@ -66,12 +74,12 @@ func (m Metrics) hash(key string) (string, error) {
 	}
 	var data string
 	switch m.MType {
-	case "counter":
+	case MetricsTypeCounter:
 		if m.Delta == nil {
 			return "", hashingMetricsError{"cannot sign metrics without value"}
 		}
 		data = fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta)
-	case "gauge":
+	case MetricsTypeGauge:
 		if m.Value == nil {
 			return "", hashingMetricsError{"cannot sign metrics without value"}
 		}
