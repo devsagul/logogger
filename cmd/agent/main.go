@@ -50,6 +50,7 @@ func main() {
 	}
 
 	pollTicker := time.NewTicker(cfg.PollInterval)
+	reportTicker := time.NewTicker(cfg.ReportInterval)
 	p, err := poller.NewPoller(0)
 	if err != nil {
 		log.Println("Could not initialize poller")
@@ -73,14 +74,17 @@ func main() {
 	}()
 
 	go func() {
-		err := report(metrics, reportHost, cfg.Key)
-		if err == nil {
-			err = p.Reset()
-			if err != nil {
-				log.Println("Unable to reset PollCount")
+		for {
+			<-reportTicker.C
+			err := report(metrics, reportHost, cfg.Key)
+			if err == nil {
+				err = p.Reset()
+				if err != nil {
+					log.Println("Unable to reset PollCount")
+				}
+			} else {
+				log.Printf("Unable to send metrics to server: %s\n", err.Error())
 			}
-		} else {
-			log.Printf("Unable to send metrics to server: %s\n", err.Error())
 		}
 	}()
 
