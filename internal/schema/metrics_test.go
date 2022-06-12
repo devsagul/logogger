@@ -71,12 +71,28 @@ func TestMetrics_Sign(t *testing.T) {
 	}
 }
 
-func TestMetrics_IsSignedWithKey(t *testing.T) {
+func TestMetrics_SignWithWrongKey(t *testing.T) {
 	key := "key test number 42"
 	wrongKey := "key test number 1337"
 	params := []Metrics{
 		NewCounter("cntID", 42),
 		NewGauge("ggID", 13.37),
+	}
+
+	for _, m := range params {
+		err := m.Sign(wrongKey)
+
+		assert.NoError(t, err)
+		b, err := m.IsSignedWithKey(key)
+
+		assert.NoError(t, err)
+		assert.False(t, b)
+	}
+}
+
+func TestMetrics_SignInvalidMetrics(t *testing.T) {
+	wrongKey := "key test number 1337"
+	params := []Metrics{
 		NewCounterRequest("cntID"),
 		NewGaugeRequest("ggID"),
 		NewEmptyMetrics(),
@@ -84,10 +100,7 @@ func TestMetrics_IsSignedWithKey(t *testing.T) {
 	}
 
 	for _, m := range params {
-		_ = m.Sign(wrongKey)
-		b, err := m.IsSignedWithKey(key)
-
-		assert.NoError(t, err)
-		assert.False(t, b)
+		err := m.Sign(wrongKey)
+		assert.Error(t, err)
 	}
 }
