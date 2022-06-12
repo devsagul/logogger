@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strconv"
 )
@@ -108,14 +109,11 @@ func (m *Metrics) Sign(key string) error {
 
 func (m Metrics) IsSignedWithKey(key string) (bool, error) {
 	h, err := m.hash(key)
-	if err != nil {
-		switch err.(type) {
-		case hashingMetricsError:
-			// the value could not be hashed at all -> it was not signed with key
-			return false, nil
-		default:
-			return false, err
-		}
+	if err == nil {
+		return m.Hash == h, nil
 	}
-	return m.Hash == h, nil
+	if errors.As(err, &hashingMetricsError{}) {
+		return false, nil
+	}
+	return false, err
 }
