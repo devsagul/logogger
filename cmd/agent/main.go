@@ -50,13 +50,13 @@ func main() {
 	}
 
 	pollTicker := time.NewTicker(cfg.PollInterval)
-	reportTicker := time.NewTicker(cfg.ReportInterval)
-	channel := make(chan []schema.Metrics)
 	p, err := poller.NewPoller(0)
 	if err != nil {
 		log.Println("Could not initialize poller")
 		os.Exit(1)
 	}
+
+	var metrics []schema.Metrics
 
 	go func() {
 		for {
@@ -66,37 +66,29 @@ func main() {
 				log.Println("Unable to poll data")
 				time.Sleep(time.Second)
 			} else {
-				channel <- l
+				// we store metrics only if poll was reliable
+				metrics = l
 			}
+		}
+	}()
+
+	go func() {
+		err := report(metrics, reportHost, cfg.Key)
+		if err == nil {
+			err = p.Reset()
+			if err != nil {
+				log.Println("Unable to reset PollCount")
+			}
+		} else {
+			log.Printf("Unable to send metrics to server: %s\n", err.Error())
 		}
 	}()
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
-	var l []schema.Metrics
-	func() {
-		var run = true
-		for run {
-			select {
-			case metrics := <-channel:
-				l = metrics
-			case <-reportTicker.C:
-				err := report(l, reportHost, cfg.Key)
-				if err == nil {
-					err = p.Reset()
-					if err != nil {
-						log.Println("Unable to reset PollCount")
-					}
-				} else {
-					log.Printf("Unable to send metrics to server: %s\n", err.Error())
-				}
-			case <-sigs:
-				log.Println("Exiting agent gracefully...")
-				run = false
-			}
-		}
-	}()
+	<-sigs
+	log.Println("Exiting agent gracefully...")
 }
 
 func report(l []schema.Metrics, host string, key string) error {

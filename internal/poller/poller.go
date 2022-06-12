@@ -9,7 +9,14 @@ import (
 	"runtime"
 	"strconv"
 
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/mem"
 	"golang.org/x/sync/errgroup"
+)
+
+const (
+	pollCount   = "PollCount"
+	randomValue = "RandomValue"
 )
 
 var SysMetrics = [...]string{
@@ -49,17 +56,17 @@ type Poller struct {
 
 func NewPoller(start int64) (Poller, error) {
 	store := storage.NewMemStorage()
-	err := store.Put(schema.NewCounter("PollCount", start))
+	err := store.Put(schema.NewCounter(pollCount, start))
 	return Poller{store, start}, err
 }
 
 func (p Poller) Poll() ([]schema.Metrics, error) {
-	err := p.store.Increment(schema.NewCounterRequest("PollCount"), 1)
+	err := p.store.Increment(schema.NewCounterRequest(pollCount), 1)
 	if err != nil {
 		return nil, err
 	}
 
-	r := schema.NewGauge("RandomValue", rand.Float64())
+	r := schema.NewGauge(randomValue, rand.Float64())
 	err = p.store.Put(r)
 	if err != nil {
 		return nil, err
@@ -71,6 +78,7 @@ func (p Poller) Poll() ([]schema.Metrics, error) {
 	reflected := reflect.ValueOf(memStats)
 
 	eg := &errgroup.Group{}
+
 	for _, stat := range SysMetrics {
 		stat := stat
 		eg.Go(func() error {
@@ -80,12 +88,40 @@ func (p Poller) Poll() ([]schema.Metrics, error) {
 				return err
 			}
 			err = p.store.Put(schema.NewGauge(stat, f))
+			return err
+		})
+	}
+
+	eg.Go(func() error {
+		v, err := mem.VirtualMemory()
+		if err != nil {
+			return err
+		}
+
+		err = p.store.Put(schema.NewGauge("TotalMemory", float64(v.Total)))
+		if err != nil {
+			return err
+		}
+
+		err = p.store.Put(schema.NewGauge("FreeMemory", float64(v.Free)))
+		return err
+	})
+
+	eg.Go(func() error {
+		utilization, err := cpu.Percent(0, true)
+		if err != nil {
+			return err
+		}
+
+		for i, percent := range utilization {
+			id := fmt.Sprintf("CPUutilization%d", i)
+			err = p.store.Put(schema.NewGauge(id, percent))
 			if err != nil {
 				return err
 			}
-			return nil
-		})
-	}
+		}
+		return nil
+	})
 
 	err = eg.Wait()
 	if err != nil {
@@ -95,5 +131,5 @@ func (p Poller) Poll() ([]schema.Metrics, error) {
 }
 
 func (p Poller) Reset() error {
-	return p.store.Put(schema.NewCounter("PollCount", p.start))
+	return p.store.Put(schema.NewCounter(pollCount, p.start))
 }

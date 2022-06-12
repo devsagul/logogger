@@ -48,14 +48,9 @@ func TestReportMetrics(t *testing.T) {
 		}
 
 		tField := m.MType
-		name := m.ID
 
 		rMu.Lock()
 		defer rMu.Unlock()
-		reportedTwice, ok := reported[name]
-		assert.True(t, ok)
-		assert.False(t, reportedTwice)
-		reported[name] = true
 
 		switch tField {
 		case "counter":
@@ -73,10 +68,6 @@ func TestReportMetrics(t *testing.T) {
 
 	if err != nil {
 		assert.FailNow(t, "Error reporting data.")
-	}
-
-	for _, value := range reported {
-		assert.True(t, value)
 	}
 }
 
