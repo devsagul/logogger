@@ -34,6 +34,9 @@ func newHandler(handler errorHTTPHandler) http.HandlerFunc {
 		ctx := request.Context()
 
 		go func() {
+			defer func() {
+				recover()
+			}()
 			errChan <- handler(writer, request)
 		}()
 

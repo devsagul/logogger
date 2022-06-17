@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"logogger/internal/schema"
 	"logogger/internal/storage"
+	"logogger/internal/utils"
 	"math/rand"
 	"reflect"
 	"runtime"
@@ -81,7 +82,7 @@ func (p Poller) Poll() ([]schema.Metrics, error) {
 
 	for _, stat := range SysMetrics {
 		stat := stat
-		eg.Go(func() error {
+		eg.Go(utils.WrapGoroutinePanic(func() error {
 			v := reflected.FieldByName(stat).Interface()
 			f, err := strconv.ParseFloat(fmt.Sprintf("%v", v), 64)
 			if err != nil {
@@ -89,10 +90,10 @@ func (p Poller) Poll() ([]schema.Metrics, error) {
 			}
 			err = p.store.Put(schema.NewGauge(stat, f))
 			return err
-		})
+		}))
 	}
 
-	eg.Go(func() error {
+	eg.Go(utils.WrapGoroutinePanic(func() error {
 		v, err := mem.VirtualMemory()
 		if err != nil {
 			return err
@@ -105,9 +106,9 @@ func (p Poller) Poll() ([]schema.Metrics, error) {
 
 		err = p.store.Put(schema.NewGauge("FreeMemory", float64(v.Free)))
 		return err
-	})
+	}))
 
-	eg.Go(func() error {
+	eg.Go(utils.WrapGoroutinePanic(func() error {
 		utilization, err := cpu.Percent(0, true)
 		if err != nil {
 			return err
@@ -121,7 +122,7 @@ func (p Poller) Poll() ([]schema.Metrics, error) {
 			}
 		}
 		return nil
-	})
+	}))
 
 	err = eg.Wait()
 	if err != nil {

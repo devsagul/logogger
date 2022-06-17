@@ -7,6 +7,7 @@ import (
 	"logogger/internal/poller"
 	"logogger/internal/reporter"
 	"logogger/internal/schema"
+	"logogger/internal/utils"
 	"os"
 	"os/signal"
 	"regexp"
@@ -59,7 +60,7 @@ func main() {
 
 	var metrics []schema.Metrics
 
-	go func() {
+	go utils.RetryForever(utils.WrapGoroutinePanic(func() error {
 		for {
 			<-pollTicker.C
 			l, err := p.Poll()
@@ -71,9 +72,10 @@ func main() {
 				metrics = l
 			}
 		}
-	}()
+		return nil
+	}), time.Minute)()
 
-	go func() {
+	go utils.RetryForever(utils.WrapGoroutinePanic(func() error {
 		for {
 			<-reportTicker.C
 			err := report(metrics, reportHost, cfg.Key)
@@ -86,7 +88,8 @@ func main() {
 				log.Printf("Unable to send metrics to server: %s\n", err.Error())
 			}
 		}
-	}()
+		return nil
+	}), time.Minute)()
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
@@ -101,14 +104,14 @@ func report(l []schema.Metrics, host string, key string) error {
 		var signed []schema.Metrics
 		for _, m := range l {
 			m := m
-			eg.Go(func() error {
+			eg.Go(utils.WrapGoroutinePanic(func() error {
 				err := m.Sign(key)
 				if err != nil {
 					return err
 				}
 				signed = append(signed, m)
 				return nil
-			})
+			}))
 		}
 		if err := eg.Wait(); err != nil {
 			return err
