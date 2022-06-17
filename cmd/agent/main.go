@@ -7,6 +7,7 @@ import (
 	"logogger/internal/poller"
 	"logogger/internal/reporter"
 	"logogger/internal/schema"
+	"logogger/internal/utils"
 	"os"
 	"os/signal"
 	"regexp"
@@ -51,14 +52,15 @@ func main() {
 
 	pollTicker := time.NewTicker(cfg.PollInterval)
 	reportTicker := time.NewTicker(cfg.ReportInterval)
-	channel := make(chan []schema.Metrics)
 	p, err := poller.NewPoller(0)
 	if err != nil {
 		log.Println("Could not initialize poller")
 		os.Exit(1)
 	}
 
-	go func() {
+	var metrics []schema.Metrics
+
+	go utils.RetryForever(utils.WrapGoroutinePanic(func() error {
 		for {
 			<-pollTicker.C
 			l, err := p.Poll()
@@ -66,37 +68,32 @@ func main() {
 				log.Println("Unable to poll data")
 				time.Sleep(time.Second)
 			} else {
-				channel <- l
+				// we store metrics only if poll was reliable
+				metrics = l
 			}
 		}
-	}()
+	}), time.Minute)()
+
+	go utils.RetryForever(utils.WrapGoroutinePanic(func() error {
+		for {
+			<-reportTicker.C
+			err := report(metrics, reportHost, cfg.Key)
+			if err == nil {
+				err = p.Reset()
+				if err != nil {
+					log.Println("Unable to reset PollCount")
+				}
+			} else {
+				log.Printf("Unable to send metrics to server: %s\n", err.Error())
+			}
+		}
+	}), time.Minute)()
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
-	var l []schema.Metrics
-	func() {
-		var run = true
-		for run {
-			select {
-			case metrics := <-channel:
-				l = metrics
-			case <-reportTicker.C:
-				err := report(l, reportHost, cfg.Key)
-				if err == nil {
-					err = p.Reset()
-					if err != nil {
-						log.Println("Unable to reset PollCount")
-					}
-				} else {
-					log.Printf("Unable to send metrics to server: %s\n", err.Error())
-				}
-			case <-sigs:
-				log.Println("Exiting agent gracefully...")
-				run = false
-			}
-		}
-	}()
+	<-sigs
+	log.Println("Exiting agent gracefully...")
 }
 
 func report(l []schema.Metrics, host string, key string) error {
@@ -105,14 +102,14 @@ func report(l []schema.Metrics, host string, key string) error {
 		var signed []schema.Metrics
 		for _, m := range l {
 			m := m
-			eg.Go(func() error {
+			eg.Go(utils.WrapGoroutinePanic(func() error {
 				err := m.Sign(key)
 				if err != nil {
 					return err
 				}
 				signed = append(signed, m)
 				return nil
-			})
+			}))
 		}
 		if err := eg.Wait(); err != nil {
 			return err

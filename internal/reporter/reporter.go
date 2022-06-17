@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"logogger/internal/schema"
+	"logogger/internal/utils"
 	"net/http"
 	"time"
 
@@ -100,9 +101,9 @@ func ReportMetrics(l []schema.Metrics, host string) error {
 	for _, m := range l {
 		m := m
 		url := fmt.Sprintf("%s/update/", host)
-		eg.Go(func() error {
+		eg.Go(utils.WrapGoroutinePanic(func() error {
 			return postRequest(url, m)
-		})
+		}))
 	}
 
 	return eg.Wait()

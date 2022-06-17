@@ -53,8 +53,9 @@ func TestReportMetrics(t *testing.T) {
 		rMu.Lock()
 		defer rMu.Unlock()
 		reportedTwice, ok := reported[name]
-		assert.True(t, ok)
-		assert.False(t, reportedTwice)
+		if ok {
+			assert.False(t, reportedTwice)
+		}
 		reported[name] = true
 
 		switch tField {
