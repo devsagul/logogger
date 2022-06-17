@@ -25,7 +25,7 @@ func WrapGoroutinePanic(g errGoroutine) errGoroutine {
 
 func RetryForever(g errGoroutine, t time.Duration) goroutine {
 	return func() {
-		for err := g(); err != nil;  {
+		for err := g(); err != nil; {
 			log.Printf("Error during function envocation: %s, will be retried in %s", err.Error(), t)
 			<-time.NewTimer(t).C
 			err = g()
