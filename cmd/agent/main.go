@@ -72,7 +72,6 @@ func main() {
 				metrics = l
 			}
 		}
-		return nil
 	}), time.Minute)()
 
 	go utils.RetryForever(utils.WrapGoroutinePanic(func() error {
@@ -88,7 +87,6 @@ func main() {
 				log.Printf("Unable to send metrics to server: %s\n", err.Error())
 			}
 		}
-		return nil
 	}), time.Minute)()
 
 	sigs := make(chan os.Signal, 1)

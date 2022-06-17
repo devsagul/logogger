@@ -15,7 +15,7 @@ func WrapGoroutinePanic(g errGoroutine) errGoroutine {
 			r := recover()
 			if r != nil {
 				log.Printf("Panic in goroutine: %s", r)
-				err = errors.New("Panic during goroutine execution")
+				err = errors.New("panic during goroutine execution")
 			}
 		}()
 		err = g()
