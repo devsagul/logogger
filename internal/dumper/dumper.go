@@ -1,3 +1,4 @@
+// Package dumper defines interface for data dumpers
 package dumper
 
 import "logogger/internal/schema"

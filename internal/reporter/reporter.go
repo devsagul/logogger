@@ -1,3 +1,4 @@
+// Package reporter implements agent-side logic for sending reports to server
 package reporter
 
 import (

@@ -1,3 +1,4 @@
+// Package server implements server-side logic
 package server
 
 import (

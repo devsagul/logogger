@@ -1,3 +1,4 @@
+// Package utils implements different project-wide utils
 package utils
 
 import (
