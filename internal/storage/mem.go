@@ -16,8 +16,8 @@ type MemStorage struct {
 
 	So I use only one mutex for the whole storage.
 	*/
-	sync.Mutex
 	m map[string]schema.Metrics
+	sync.Mutex
 }
 
 func (storage *MemStorage) Put(req schema.Metrics) error {

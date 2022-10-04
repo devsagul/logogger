@@ -3,8 +3,8 @@ package server
 import "strings"
 
 type requestError struct {
-	status int
 	body   string
+	status int
 }
 
 func (e *requestError) Error() string {

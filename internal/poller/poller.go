@@ -84,41 +84,41 @@ func (p Poller) Poll() ([]schema.Metrics, error) {
 		stat := stat
 		eg.Go(utils.WrapGoroutinePanic(func() error {
 			v := reflected.FieldByName(stat).Interface()
-			f, err := strconv.ParseFloat(fmt.Sprintf("%v", v), 64)
-			if err != nil {
-				return err
+			f, err_ := strconv.ParseFloat(fmt.Sprintf("%v", v), 64)
+			if err_ != nil {
+				return err_
 			}
-			err = p.store.Put(schema.NewGauge(stat, f))
-			return err
+			err_ = p.store.Put(schema.NewGauge(stat, f))
+			return err_
 		}))
 	}
 
 	eg.Go(utils.WrapGoroutinePanic(func() error {
-		v, err := mem.VirtualMemory()
-		if err != nil {
+		v, err_ := mem.VirtualMemory()
+		if err_ != nil {
 			return err
 		}
 
-		err = p.store.Put(schema.NewGauge("TotalMemory", float64(v.Total)))
-		if err != nil {
-			return err
+		err_ = p.store.Put(schema.NewGauge("TotalMemory", float64(v.Total)))
+		if err_ != nil {
+			return err_
 		}
 
-		err = p.store.Put(schema.NewGauge("FreeMemory", float64(v.Free)))
-		return err
+		err_ = p.store.Put(schema.NewGauge("FreeMemory", float64(v.Free)))
+		return err_
 	}))
 
 	eg.Go(utils.WrapGoroutinePanic(func() error {
-		utilization, err := cpu.Percent(0, true)
-		if err != nil {
-			return err
+		utilization, err_ := cpu.Percent(0, true)
+		if err_ != nil {
+			return err_
 		}
 
 		for i, percent := range utilization {
 			id := fmt.Sprintf("CPUutilization%d", i)
-			err = p.store.Put(schema.NewGauge(id, percent))
-			if err != nil {
-				return err
+			err_ = p.store.Put(schema.NewGauge(id, percent))
+			if err_ != nil {
+				return err_
 			}
 		}
 		return nil

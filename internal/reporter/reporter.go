@@ -15,9 +15,9 @@ import (
 )
 
 type ServerResponse struct {
-	url  string
 	resp *http.Response
 	err  error
+	url  string
 	dur  time.Duration
 }
 

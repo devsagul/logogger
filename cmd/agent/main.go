@@ -20,10 +20,10 @@ import (
 )
 
 type config struct {
-	PollInterval   time.Duration `env:"POLL_INTERVAL"`
-	ReportInterval time.Duration `env:"REPORT_INTERVAL"`
 	ReportHost     string        `env:"ADDRESS"`
 	Key            string        `env:"KEY"`
+	PollInterval   time.Duration `env:"POLL_INTERVAL"`
+	ReportInterval time.Duration `env:"REPORT_INTERVAL"`
 }
 
 var cfg config

@@ -119,7 +119,7 @@ func (p *PostgresStorage) List() ([]schema.Metrics, error) {
 
 	tx, err := p.db.Begin()
 	defer func() {
-		err := tx.Rollback()
+		err = tx.Rollback()
 		if err != nil {
 			log.Printf("Error occured on Rollback: %s", err.Error())
 		}
@@ -162,7 +162,7 @@ func (p *PostgresStorage) BulkPut(values []schema.Metrics) error {
 		return err
 	}
 	defer func() {
-		err := tx.Rollback()
+		err = tx.Rollback()
 		if err != nil {
 			log.Printf("Error occured on Rollback: %s", err.Error())
 		}
@@ -198,7 +198,7 @@ func (p *PostgresStorage) BulkUpdate(counters []schema.Metrics, gauges []schema.
 		return err
 	}
 	defer func() {
-		err := tx.Rollback()
+		err = tx.Rollback()
 		if err != nil {
 			log.Printf("Error occured on Rollback: %s", err.Error())
 		}

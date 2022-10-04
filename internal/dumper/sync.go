@@ -8,9 +8,9 @@ import (
 )
 
 type SyncDumper struct {
+	filename string
 	wg       sync.WaitGroup
 	mu       sync.Mutex
-	filename string
 }
 
 func (d *SyncDumper) Dump(l []schema.Metrics) error {

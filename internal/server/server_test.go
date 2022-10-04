@@ -24,14 +24,14 @@ func TestApp_RetrieveValue(t *testing.T) {
 	params := []struct {
 		t     schema.MetricsType
 		id    string
-		code  int
 		body  string
+		code  int
 		exact bool
 	}{
-		{schema.MetricsTypeCounter, "ctrID", http.StatusOK, "42", true},
-		{schema.MetricsTypeGauge, "ctrID", http.StatusConflict, "actual type in storage is counter", false},
-		{schema.MetricsTypeCounter, "nonExistent", http.StatusNotFound, "Could not find metrics", false},
-		{"stats", "nonExistent", http.StatusNotImplemented, "Could not perform requested operation", false},
+		{schema.MetricsTypeCounter, "ctrID", "42", http.StatusOK, true},
+		{schema.MetricsTypeGauge, "ctrID", "actual type in storage is counter", http.StatusConflict, false},
+		{schema.MetricsTypeCounter, "nonExistent", "Could not find metrics", http.StatusNotFound, false},
+		{"stats", "nonExistent", "Could not perform requested operation", http.StatusNotImplemented, false},
 	}
 	for _, param := range params {
 		url := fmt.Sprintf("/value/%s/%s", param.t, param.id)
@@ -329,12 +329,12 @@ func TestApp_RetrieveValueJSON(t *testing.T) {
 
 	params := [...]struct {
 		request schema.Metrics
-		code    int
 		needle  string
+		code    int
 	}{
-		{schema.NewCounterRequest("nonExistent"), http.StatusNotFound, "Could not find"},
-		{schema.NewCounterRequest("ctrID"), http.StatusOK, string(marshalled)},
-		{schema.NewGaugeRequest("ctrID"), http.StatusConflict, "actual type in storage is counter"},
+		{schema.NewCounterRequest("nonExistent"), "Could not find", http.StatusNotFound},
+		{schema.NewCounterRequest("ctrID"), string(marshalled), http.StatusOK},
+		{schema.NewGaugeRequest("ctrID"), "actual type in storage is counter", http.StatusConflict},
 	}
 
 	for _, param := range params {

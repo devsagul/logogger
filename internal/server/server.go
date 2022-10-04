@@ -18,12 +18,12 @@ import (
 )
 
 type App struct {
-	store  storage.MetricsStorage
 	db     storage.MetricsStorage
-	Router *chi.Mux
-	sync   bool
+	store  storage.MetricsStorage
 	dumper dumper.Dumper
+	Router *chi.Mux
 	key    string
+	sync   bool
 }
 
 type errorHTTPHandler func(http.ResponseWriter, *http.Request) error
@@ -167,9 +167,9 @@ func (app *App) updateValueJSON(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	if app.key != "" {
-		signed, err := m.IsSignedWithKey(app.key)
-		if err != nil {
-			return err
+		signed, err_ := m.IsSignedWithKey(app.key)
+		if err_ != nil {
+			return err_
 		}
 		if !signed {
 			return ValidationError("signature mismatch")
@@ -243,9 +243,9 @@ func (app *App) updateValuesJSON(w http.ResponseWriter, r *http.Request) error {
 
 	for _, item := range m {
 		if app.key != "" {
-			signed, err := item.IsSignedWithKey(app.key)
-			if err != nil {
-				return err
+			signed, err_ := item.IsSignedWithKey(app.key)
+			if err_ != nil {
+				return err_
 			}
 			if !signed {
 				return ValidationError("signature mismatch")

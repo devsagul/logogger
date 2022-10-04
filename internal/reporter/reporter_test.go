@@ -40,10 +40,10 @@ func TestReportMetrics(t *testing.T) {
 		assert.Equal(t, "/update/", url)
 
 		var m schema.Metrics
-		err := json.NewDecoder(request.Body).Decode(&m)
+		err_ := json.NewDecoder(request.Body).Decode(&m)
 
-		assert.Nil(t, err)
-		if err != nil {
+		assert.Nil(t, err_)
+		if err_ != nil {
 			t.Fatalf("Error decoding metrics.")
 		}
 
