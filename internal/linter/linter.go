@@ -8,7 +8,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-var MainExitkAnalyzer = &analysis.Analyzer{
+var MainExitAnalyzer = &analysis.Analyzer{
 	Name: "mainexit",
 	Doc:  "check for exit on main",
 	Run:  run,

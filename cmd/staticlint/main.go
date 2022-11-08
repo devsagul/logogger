@@ -1,3 +1,53 @@
+/*
+Staticlint runs different static (linter) checks on the project.
+
+Static lint uses multilint to run different linters.
+
+Usage:
+
+	gofmt [flags] package
+
+The flags are identical to multilint flags.
+
+The exact checkers are:
+
+	asmdecl.Analyzer -- reports mismatches between assembly files and Go declarations
+	assign.Analyzer -- detects useless assignments
+	atomic.Analyzer -- checks for common mistakes using the sync/atomic package
+	atomicalign.Analyzer -- checks for non-64-bit-aligned arguments to sync/atomic functions
+	bools.Analyzer -- detects common mistakes involving boolean operators
+	buildtag.Analyzer -- checks build tags
+	cgocall.Analyzer -- detects some violations of the cgo pointer passing rules
+	composite.Analyzer -- checks for unkeyed composite literals
+	copylock.Analyzer -- checks for locks erroneously passed by value
+	deepequalerrors.Analyzer -- checks for the use of reflect.DeepEqual with error values
+	errorsas.Analyzer -- checks that the second argument to errors.As is a pointer to a type implementing error
+	fieldalignment.Analyzer -- detects structs that would use less memory if their fields were sorted
+	framepointer.Analyzer -- reports assembly code that clobbers the frame pointer before saving it
+	httpresponse.Analyzer -- checks for mistakes using HTTP responses
+	ifaceassert.Analyzer -- flags impossible interface-interface type assertions
+	loopclosure.Analyzer -- checks for references to enclosing loop variables from within nested functions
+	lostcancel.Analyzer -- checks for failure to call a context cancellation function
+	nilfunc.Analyzer -- checks for useless comparisons against nil
+	printf.Analyzer -- hecks consistency of Printf format strings and arguments
+	reflectvaluecompare.Analyzer -- checks for accidentally using == or reflect.DeepEqual to compare reflect.Value values
+	shadow.Analyzer -- checks for shadowed variables
+	shift.Analyzer -- checks for shifts that exceed the width of an integer
+	sigchanyzer.Analyzer -- detects misuse of unbuffered signal as argument to signal.Notify
+	sortslice.Analyzer -- checks for calls to sort.Slice that do not use a slice type as first argument
+	stdmethods.Analyzer -- checks for misspellings in the signatures of methods similar to well-known interfaces
+	stringintconv.Analyzer -- flags type conversions from integers to strings
+	structtag.Analyzer -- checks struct field tags are well formed
+	unmarshal.Analyzer -- checks for passing non-pointer or non-interface types to unmarshal and decode functions
+	unreachable.Analyzer -- checks for unreachable code
+	unsafeptr.Analyzer -- checks for invalid conversions of uintptr to unsafe.Pointer
+	unusedresult.Analyzer -- checks for unused results of calls to certain pure functions
+	unusedwrite.Analyzer -- checks for unused writes to the elements of a struct or array object
+	usesgenerics.Analyzer -- checks for usage of generic features
+
+and also custom analyzer MainExitAnalyzer which flags all calls to os.Exit in the function main
+of the package main
+*/
 package main
 
 import (
@@ -6,15 +56,14 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/multichecker"
 	"golang.org/x/tools/go/analysis/passes/asmdecl"
+	"golang.org/x/tools/go/analysis/passes/assign"
 	"golang.org/x/tools/go/analysis/passes/atomic"
 	"golang.org/x/tools/go/analysis/passes/atomicalign"
 	"golang.org/x/tools/go/analysis/passes/bools"
-	"golang.org/x/tools/go/analysis/passes/buildssa"
 	"golang.org/x/tools/go/analysis/passes/buildtag"
 	"golang.org/x/tools/go/analysis/passes/cgocall"
 	"golang.org/x/tools/go/analysis/passes/composite"
 	"golang.org/x/tools/go/analysis/passes/copylock"
-	"golang.org/x/tools/go/analysis/passes/ctrlflow"
 	"golang.org/x/tools/go/analysis/passes/deepequalerrors"
 	"golang.org/x/tools/go/analysis/passes/errorsas"
 	"golang.org/x/tools/go/analysis/passes/fieldalignment"
@@ -24,7 +73,6 @@ import (
 	"golang.org/x/tools/go/analysis/passes/loopclosure"
 	"golang.org/x/tools/go/analysis/passes/lostcancel"
 	"golang.org/x/tools/go/analysis/passes/nilfunc"
-	"golang.org/x/tools/go/analysis/passes/nilness"
 	"golang.org/x/tools/go/analysis/passes/printf"
 	"golang.org/x/tools/go/analysis/passes/reflectvaluecompare"
 	"golang.org/x/tools/go/analysis/passes/shadow"
@@ -45,21 +93,21 @@ import (
 	"honnef.co/go/tools/stylecheck"
 )
 
+// Timespan in which key has to be refreshed prior to its spoilage
 func main() {
 	var analyzers []*analysis.Analyzer
 
 	analyzers = append(
 		analyzers,
 		asmdecl.Analyzer,
+		assign.Analyzer,
 		atomic.Analyzer,
 		atomicalign.Analyzer,
 		bools.Analyzer,
-		buildssa.Analyzer,
 		buildtag.Analyzer,
 		cgocall.Analyzer,
 		composite.Analyzer,
 		copylock.Analyzer,
-		ctrlflow.Analyzer,
 		deepequalerrors.Analyzer,
 		errorsas.Analyzer,
 		fieldalignment.Analyzer,
@@ -69,7 +117,6 @@ func main() {
 		loopclosure.Analyzer,
 		lostcancel.Analyzer,
 		nilfunc.Analyzer,
-		nilness.Analyzer,
 		printf.Analyzer,
 		reflectvaluecompare.Analyzer,
 		shadow.Analyzer,
@@ -97,7 +144,7 @@ func main() {
 		analyzers = append(analyzers, v.Analyzer)
 	}
 
-	analyzers = append(analyzers, linter.MainExitkAnalyzer)
+	analyzers = append(analyzers, linter.MainExitAnalyzer)
 
 	multichecker.Main(analyzers...)
 }
