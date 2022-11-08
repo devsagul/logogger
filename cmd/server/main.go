@@ -10,11 +10,18 @@ import (
 	"logogger/internal/schema"
 	"logogger/internal/server"
 	"logogger/internal/storage"
+	"logogger/internal/utils"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/caarlos0/env/v6"
+)
+
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
 )
 
 type config struct {
@@ -38,6 +45,7 @@ func init() {
 }
 
 func main() {
+	utils.PrintVersionInfo(buildVersion, buildDate, buildCommit)
 	log.Println("Initializing server...")
 	log.Printf("%v", os.Args)
 	flag.Parse()

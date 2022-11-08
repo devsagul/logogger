@@ -19,6 +19,12 @@ import (
 	"github.com/caarlos0/env/v6"
 )
 
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
 type config struct {
 	ReportHost     string        `env:"ADDRESS"`
 	Key            string        `env:"KEY"`
@@ -36,6 +42,7 @@ func init() {
 }
 
 func main() {
+	utils.PrintVersionInfo(buildVersion, buildDate, buildCommit)
 	flag.Parse()
 	err := env.Parse(&cfg)
 	if err != nil {
