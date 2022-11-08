@@ -36,7 +36,7 @@ func RetryForever(g errGoroutine, t time.Duration) goroutine {
 }
 
 func coalesceString(s string, val string) string {
-	if string != "" {
+	if s != "" {
 		return s
 	}
 	return val
