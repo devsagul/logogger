@@ -1,6 +1,8 @@
 package main
 
 import (
+	"logogger/internal/linter"
+
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/multichecker"
 	"golang.org/x/tools/go/analysis/passes/asmdecl"
@@ -94,6 +96,8 @@ func main() {
 	for _, v := range stylecheck.Analyzers {
 		analyzers = append(analyzers, v.Analyzer)
 	}
+
+	analyzers = append(analyzers, linter.MainExitkAnalyzer)
 
 	multichecker.Main(analyzers...)
 }
