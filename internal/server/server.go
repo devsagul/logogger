@@ -20,7 +20,6 @@ import (
 )
 
 type App struct {
-	db     storage.MetricsStorage
 	store  storage.MetricsStorage
 	dumper dumper.Dumper
 	Router *chi.Mux
@@ -371,7 +370,7 @@ func (app *App) retrieveValueJSON(w http.ResponseWriter, r *http.Request) error 
 func (app *App) ping(w http.ResponseWriter, r *http.Request) error {
 	store := app.store.WithContext(r.Context())
 	err := store.Ping()
-	log.Printf("Ping result: %v", app.db.Ping())
+	log.Printf("Ping result: %v", err)
 	if err != nil {
 		return err
 	}
