@@ -2,9 +2,10 @@ package dumper
 
 import (
 	"encoding/json"
-	"logogger/internal/schema"
 	"os"
 	"sync"
+
+	"logogger/internal/schema"
 )
 
 type SyncDumper struct {

@@ -3,10 +3,11 @@ package server
 import (
 	"fmt"
 	"log"
-	"logogger/internal/schema"
-	"logogger/internal/storage"
 	"net/http"
 	"strconv"
+
+	"logogger/internal/schema"
+	"logogger/internal/storage"
 )
 
 func SafeWrite(w http.ResponseWriter, status int, format string, args ...interface{}) {

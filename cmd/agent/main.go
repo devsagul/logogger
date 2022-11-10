@@ -4,19 +4,19 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"logogger/internal/poller"
-	"logogger/internal/reporter"
-	"logogger/internal/schema"
-	"logogger/internal/utils"
 	"os"
 	"os/signal"
 	"regexp"
 	"syscall"
 	"time"
 
+	"github.com/caarlos0/env/v6"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/caarlos0/env/v6"
+	"logogger/internal/poller"
+	"logogger/internal/reporter"
+	"logogger/internal/schema"
+	"logogger/internal/utils"
 )
 
 var (

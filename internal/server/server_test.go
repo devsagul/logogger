@@ -2,17 +2,19 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"logogger/internal/schema"
-	"logogger/internal/storage"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"logogger/internal/schema"
+	"logogger/internal/storage"
 )
 
 func TestApp_RetrieveValue(t *testing.T) {
@@ -477,4 +479,8 @@ func (faultyStorage) Ping() error {
 
 func (faultyStorage) Close() error {
 	return nil
+}
+
+func (f faultyStorage) WithContext(context.Context) storage.MetricsStorage {
+	return f
 }

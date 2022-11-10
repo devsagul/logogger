@@ -51,8 +51,6 @@ of the package main
 package main
 
 import (
-	"logogger/internal/linter"
-
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/multichecker"
 	"golang.org/x/tools/go/analysis/passes/asmdecl"
@@ -91,6 +89,8 @@ import (
 	"honnef.co/go/tools/simple"
 	"honnef.co/go/tools/staticcheck"
 	"honnef.co/go/tools/stylecheck"
+
+	"logogger/internal/linter"
 )
 
 // Timespan in which key has to be refreshed prior to its spoilage

@@ -3,14 +3,15 @@ package reporter
 import (
 	"encoding/json"
 	"fmt"
-	"logogger/internal/poller"
-	"logogger/internal/schema"
 	"net/http"
 	"net/http/httptest"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"logogger/internal/poller"
+	"logogger/internal/schema"
 )
 
 func TestReportMetrics(t *testing.T) {

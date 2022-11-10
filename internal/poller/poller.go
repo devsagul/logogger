@@ -3,9 +3,6 @@ package poller
 
 import (
 	"fmt"
-	"logogger/internal/schema"
-	"logogger/internal/storage"
-	"logogger/internal/utils"
 	"math/rand"
 	"reflect"
 	"runtime"
@@ -14,6 +11,10 @@ import (
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
 	"golang.org/x/sync/errgroup"
+
+	"logogger/internal/schema"
+	"logogger/internal/storage"
+	"logogger/internal/utils"
 )
 
 const (

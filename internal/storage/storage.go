@@ -2,6 +2,8 @@
 package storage
 
 import (
+	"context"
+
 	"logogger/internal/schema"
 )
 
@@ -14,4 +16,5 @@ type MetricsStorage interface {
 	BulkUpdate(counters []schema.Metrics, gauges []schema.Metrics) error
 	Ping() error
 	Close() error
+	WithContext(ctx context.Context) MetricsStorage
 }

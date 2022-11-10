@@ -7,15 +7,16 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"logogger/internal/dumper"
-	"logogger/internal/schema"
-	"logogger/internal/storage"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+
+	"logogger/internal/dumper"
+	"logogger/internal/schema"
+	"logogger/internal/storage"
 )
 
 type App struct {
@@ -72,7 +73,9 @@ func (app *App) retrieveValue(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
-	value, err := app.store.Extract(req)
+	store := app.store.WithContext(r.Context())
+
+	value, err := store.Extract(req)
 	if err != nil {
 		return err
 	}
@@ -94,13 +97,15 @@ func (app *App) updateValue(w http.ResponseWriter, r *http.Request) error {
 
 	switch value.MType {
 	case "counter":
-		err = app.store.Increment(value, *value.Delta)
+		store := app.store.WithContext(r.Context())
+		err = store.Increment(value, *value.Delta)
 		switch err.(type) {
 		case *storage.NotFound:
-			err = app.store.Put(value)
+			err = store.Put(value)
 		}
 	case "gauge":
-		err = app.store.Put(value)
+		store := app.store.WithContext(r.Context())
+		err = store.Put(value)
 	default:
 		return &requestError{
 			status: http.StatusNotImplemented,
@@ -119,8 +124,9 @@ func (app *App) updateValue(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (app *App) listMetrics(w http.ResponseWriter, _ *http.Request) error {
-	list, err := app.store.List()
+func (app *App) listMetrics(w http.ResponseWriter, r *http.Request) error {
+	store := app.store.WithContext(r.Context())
+	list, err := store.List()
 	if err != nil {
 		return err
 	}
@@ -177,15 +183,17 @@ func (app *App) updateValueJSON(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
+	store := app.store.WithContext(r.Context())
+
 	switch m.MType {
 	case schema.MetricsTypeCounter:
-		err = app.store.Increment(m, *m.Delta)
+		err = store.Increment(m, *m.Delta)
 		switch err.(type) {
 		case *storage.NotFound:
-			err = app.store.Put(m)
+			err = store.Put(m)
 		}
 	case schema.MetricsTypeGauge:
-		err = app.store.Put(m)
+		err = store.Put(m)
 	default:
 		return &requestError{
 			status: http.StatusNotImplemented,
@@ -197,7 +205,7 @@ func (app *App) updateValueJSON(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	value, err := app.store.Extract(m)
+	value, err := store.Extract(m)
 	if err != nil {
 		return err
 	}
@@ -265,12 +273,14 @@ func (app *App) updateValuesJSON(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
-	err = app.store.BulkUpdate(counters, gauges)
+	store := app.store.WithContext(r.Context())
+
+	err = store.BulkUpdate(counters, gauges)
 	if err != nil {
 		return err
 	}
 
-	values, err := app.store.List()
+	values, err := store.List()
 	if err != nil {
 		return err
 	}
@@ -336,7 +346,8 @@ func (app *App) retrieveValueJSON(w http.ResponseWriter, r *http.Request) error 
 		}
 	}
 
-	value, err = app.store.Extract(m)
+	store := app.store.WithContext(r.Context())
+	value, err = store.Extract(m)
 	if err != nil {
 		return err
 	}
@@ -358,7 +369,8 @@ func (app *App) retrieveValueJSON(w http.ResponseWriter, r *http.Request) error 
 }
 
 func (app *App) ping(w http.ResponseWriter, r *http.Request) error {
-	err := app.db.Ping()
+	store := app.store.WithContext(r.Context())
+	err := store.Ping()
 	log.Printf("Ping result: %v", app.db.Ping())
 	if err != nil {
 		return err
@@ -391,7 +403,6 @@ func NewApp(
 	app.dumper = dumper.NoOpDumper{}
 	app.sync = false
 	app.key = ""
-	app.db = store
 
 	// useful middlewares
 	r.Use(middleware.RequestID)

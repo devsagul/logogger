@@ -6,13 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"logogger/internal/schema"
-	"logogger/internal/utils"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
+
+	"logogger/internal/schema"
+	"logogger/internal/utils"
 )
 
 type ServerResponse struct {

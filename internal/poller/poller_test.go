@@ -1,10 +1,11 @@
 package poller
 
 import (
-	"logogger/internal/schema"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"logogger/internal/schema"
 )
 
 func extractCounter(t *testing.T, p Poller) int64 {

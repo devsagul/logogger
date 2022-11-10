@@ -2,12 +2,13 @@ package storage
 
 import (
 	"fmt"
-	"logogger/internal/schema"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/errgroup"
+
+	"logogger/internal/schema"
 )
 
 const concurrency = 50

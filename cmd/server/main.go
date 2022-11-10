@@ -6,16 +6,17 @@ import (
 	"flag"
 	"io"
 	"log"
-	"logogger/internal/dumper"
-	"logogger/internal/schema"
-	"logogger/internal/server"
-	"logogger/internal/storage"
-	"logogger/internal/utils"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/caarlos0/env/v6"
+
+	"logogger/internal/dumper"
+	"logogger/internal/schema"
+	"logogger/internal/server"
+	"logogger/internal/storage"
+	"logogger/internal/utils"
 )
 
 var (

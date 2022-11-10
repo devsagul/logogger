@@ -2,12 +2,13 @@ package server
 
 import (
 	"errors"
-	"logogger/internal/schema"
-	"logogger/internal/storage"
 	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"logogger/internal/schema"
+	"logogger/internal/storage"
 )
 
 type okWriter struct {

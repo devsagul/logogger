@@ -1,9 +1,11 @@
 package storage
 
 import (
-	"logogger/internal/schema"
+	"context"
 	"sort"
 	"sync"
+
+	"logogger/internal/schema"
 )
 
 type MemStorage struct {
@@ -119,6 +121,10 @@ func (*MemStorage) Ping() error {
 
 func (*MemStorage) Close() error {
 	return nil
+}
+
+func (storage *MemStorage) WithContext(ctx context.Context) MetricsStorage {
+	return storage
 }
 
 func NewMemStorage() *MemStorage {
