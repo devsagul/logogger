@@ -2,28 +2,37 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"io"
 	"log"
-	"logogger/internal/dumper"
-	"logogger/internal/schema"
-	"logogger/internal/server"
-	"logogger/internal/storage"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/caarlos0/env/v6"
+
+	"logogger/internal/dumper"
+	"logogger/internal/schema"
+	"logogger/internal/server"
+	"logogger/internal/storage"
+	"logogger/internal/utils"
+)
+
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
 )
 
 type config struct {
 	Address       string        `env:"ADDRESS"`
-	StoreInterval time.Duration `env:"STORE_INTERVAL"`
 	StoreFile     string        `env:"STORE_FILE"`
-	Restore       bool          `env:"RESTORE"`
 	Key           string        `env:"KEY"`
 	DatabaseDSN   string        `env:"DATABASE_DSN"`
+	StoreInterval time.Duration `env:"STORE_INTERVAL"`
+	Restore       bool          `env:"RESTORE"`
 }
 
 var cfg config
@@ -38,6 +47,7 @@ func init() {
 }
 
 func main() {
+	utils.PrintVersionInfo(buildVersion, buildDate, buildCommit)
 	log.Println("Initializing server...")
 	log.Printf("%v", os.Args)
 	flag.Parse()
@@ -71,36 +81,36 @@ func main() {
 	if cfg.Restore && cfg.DatabaseDSN == "" {
 		log.Println("Restoring storage from file...")
 		func() {
-			f, err := os.OpenFile(cfg.StoreFile, os.O_RDONLY|os.O_CREATE, 0644)
-			if err != nil {
-				log.Fatal("Could not open file : ", err)
+			f, err_ := os.OpenFile(cfg.StoreFile, os.O_RDONLY|os.O_CREATE, 0644)
+			if err_ != nil {
+				log.Fatal("Could not open file : ", err_)
 			}
 
 			buf := bytes.NewBuffer(nil)
-			n, err := io.Copy(buf, f)
+			n, err_ := io.Copy(buf, f)
 			if n == 0 {
 				// file is empty, valid scenario
 				// nothing to restore
 				return
 			}
-			if err != nil {
-				log.Fatal("Could not read data : ", err)
+			if err_ != nil {
+				log.Fatal("Could not read data : ", err_)
 			}
 
 			var l []schema.Metrics
-			err = json.Unmarshal(buf.Bytes(), &l)
-			if err != nil {
-				log.Fatal("Could not restore data : ", err)
+			err_ = json.Unmarshal(buf.Bytes(), &l)
+			if err_ != nil {
+				log.Fatal("Could not restore data : ", err_)
 			}
 
-			err = store.BulkPut(l)
-			if err != nil {
-				log.Fatal("Could not save restored data : ", err)
+			err_ = store.BulkPut(context.Background(), l)
+			if err_ != nil {
+				log.Fatal("Could not save restored data : ", err_)
 			}
 
-			err = f.Close()
-			if err != nil {
-				log.Fatal("Could not close dump file : ", err)
+			err_ = f.Close()
+			if err_ != nil {
+				log.Fatal("Could not close dump file : ", err_)
 			}
 		}()
 	}
@@ -109,9 +119,9 @@ func main() {
 	d := dumper.NewSyncDumper(cfg.StoreFile)
 
 	defer func() {
-		err := d.Close()
-		if err != nil {
-			log.Fatal("Error Closing dumper : ", err)
+		err_ := d.Close()
+		if err_ != nil {
+			log.Fatal("Error Closing dumper : ", err_)
 		}
 	}()
 

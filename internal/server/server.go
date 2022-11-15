@@ -1,29 +1,31 @@
+// Package server implements server-side logic
 package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
-	"logogger/internal/dumper"
-	"logogger/internal/schema"
-	"logogger/internal/storage"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+
+	"logogger/internal/dumper"
+	"logogger/internal/schema"
+	"logogger/internal/storage"
 )
 
 type App struct {
 	store  storage.MetricsStorage
-	db     storage.MetricsStorage
-	Router *chi.Mux
-	sync   bool
 	dumper dumper.Dumper
+	Router *chi.Mux
 	key    string
+	sync   bool
 }
 
 type errorHTTPHandler func(http.ResponseWriter, *http.Request) error
@@ -71,7 +73,7 @@ func (app *App) retrieveValue(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
-	value, err := app.store.Extract(req)
+	value, err := app.store.Extract(r.Context(), req)
 	if err != nil {
 		return err
 	}
@@ -93,13 +95,13 @@ func (app *App) updateValue(w http.ResponseWriter, r *http.Request) error {
 
 	switch value.MType {
 	case "counter":
-		err = app.store.Increment(value, *value.Delta)
+		err = app.store.Increment(r.Context(), value, *value.Delta)
 		switch err.(type) {
 		case *storage.NotFound:
-			err = app.store.Put(value)
+			err = app.store.Put(r.Context(), value)
 		}
 	case "gauge":
-		err = app.store.Put(value)
+		err = app.store.Put(r.Context(), value)
 	default:
 		return &requestError{
 			status: http.StatusNotImplemented,
@@ -113,13 +115,14 @@ func (app *App) updateValue(w http.ResponseWriter, r *http.Request) error {
 
 	SafeWrite(w, http.StatusOK, "Status: OK")
 	if app.sync {
-		app.safeDump()
+		// safe dump does not depend on request, so we use background context
+		go app.safeDump(context.Background())
 	}
 	return nil
 }
 
-func (app *App) listMetrics(w http.ResponseWriter, _ *http.Request) error {
-	list, err := app.store.List()
+func (app *App) listMetrics(w http.ResponseWriter, r *http.Request) error {
+	list, err := app.store.List(r.Context())
 	if err != nil {
 		return err
 	}
@@ -167,9 +170,9 @@ func (app *App) updateValueJSON(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	if app.key != "" {
-		signed, err := m.IsSignedWithKey(app.key)
-		if err != nil {
-			return err
+		signed, err_ := m.IsSignedWithKey(app.key)
+		if err_ != nil {
+			return err_
 		}
 		if !signed {
 			return ValidationError("signature mismatch")
@@ -178,13 +181,13 @@ func (app *App) updateValueJSON(w http.ResponseWriter, r *http.Request) error {
 
 	switch m.MType {
 	case schema.MetricsTypeCounter:
-		err = app.store.Increment(m, *m.Delta)
+		err = app.store.Increment(r.Context(), m, *m.Delta)
 		switch err.(type) {
 		case *storage.NotFound:
-			err = app.store.Put(m)
+			err = app.store.Put(r.Context(), m)
 		}
 	case schema.MetricsTypeGauge:
-		err = app.store.Put(m)
+		err = app.store.Put(r.Context(), m)
 	default:
 		return &requestError{
 			status: http.StatusNotImplemented,
@@ -196,7 +199,7 @@ func (app *App) updateValueJSON(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	value, err := app.store.Extract(m)
+	value, err := app.store.Extract(r.Context(), m)
 	if err != nil {
 		return err
 	}
@@ -214,7 +217,8 @@ func (app *App) updateValueJSON(w http.ResponseWriter, r *http.Request) error {
 
 	SafeWrite(w, http.StatusOK, string(serialized))
 	if app.sync {
-		go app.safeDump()
+		// safe dump does not depend on request, so we use background context
+		go app.safeDump(context.Background())
 	}
 	return nil
 }
@@ -243,9 +247,9 @@ func (app *App) updateValuesJSON(w http.ResponseWriter, r *http.Request) error {
 
 	for _, item := range m {
 		if app.key != "" {
-			signed, err := item.IsSignedWithKey(app.key)
-			if err != nil {
-				return err
+			signed, err_ := item.IsSignedWithKey(app.key)
+			if err_ != nil {
+				return err_
 			}
 			if !signed {
 				return ValidationError("signature mismatch")
@@ -264,12 +268,12 @@ func (app *App) updateValuesJSON(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
-	err = app.store.BulkUpdate(counters, gauges)
+	err = app.store.BulkUpdate(r.Context(), counters, gauges)
 	if err != nil {
 		return err
 	}
 
-	values, err := app.store.List()
+	values, err := app.store.List(r.Context())
 	if err != nil {
 		return err
 	}
@@ -300,7 +304,8 @@ func (app *App) updateValuesJSON(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	if app.sync {
-		go app.safeDump()
+		// safe dump does not depend on request, so we use background context
+		go app.safeDump(context.Background())
 	}
 	return nil
 }
@@ -335,7 +340,7 @@ func (app *App) retrieveValueJSON(w http.ResponseWriter, r *http.Request) error 
 		}
 	}
 
-	value, err = app.store.Extract(m)
+	value, err = app.store.Extract(r.Context(), m)
 	if err != nil {
 		return err
 	}
@@ -357,8 +362,8 @@ func (app *App) retrieveValueJSON(w http.ResponseWriter, r *http.Request) error 
 }
 
 func (app *App) ping(w http.ResponseWriter, r *http.Request) error {
-	err := app.db.Ping()
-	log.Printf("Ping result: %v", app.db.Ping())
+	err := app.store.Ping(r.Context())
+	log.Printf("Ping result: %v", err)
 	if err != nil {
 		return err
 	}
@@ -366,9 +371,9 @@ func (app *App) ping(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (app *App) safeDump() {
+func (app *App) safeDump(ctx context.Context) {
 	log.Print("Dumping current storage state...")
-	l, err := app.store.List()
+	l, err := app.store.List(ctx)
 	if err != nil {
 		log.Print("Could not retrieve values from storage")
 		return
@@ -390,7 +395,6 @@ func NewApp(
 	app.dumper = dumper.NoOpDumper{}
 	app.sync = false
 	app.key = ""
-	app.db = store
 
 	// useful middlewares
 	r.Use(middleware.RequestID)
@@ -425,7 +429,7 @@ func (app *App) WithDumpInterval(interval time.Duration) *App {
 	go func() {
 		for {
 			<-t.C
-			app.safeDump()
+			app.safeDump(context.Background())
 		}
 	}()
 

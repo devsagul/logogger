@@ -3,10 +3,11 @@ package server
 import (
 	"fmt"
 	"log"
-	"logogger/internal/schema"
-	"logogger/internal/storage"
 	"net/http"
 	"strconv"
+
+	"logogger/internal/schema"
+	"logogger/internal/storage"
 )
 
 func SafeWrite(w http.ResponseWriter, status int, format string, args ...interface{}) {
@@ -63,6 +64,6 @@ func ParseMetric(valueType string, name string, rawValue string) (schema.Metrics
 		}
 		return schema.NewGauge(name, value), nil
 	default:
-		return schema.NewEmptyMetrics(), &requestError{http.StatusNotImplemented, fmt.Sprintf("Could not perform requested operation on type %s", valueType)}
+		return schema.NewEmptyMetrics(), &requestError{fmt.Sprintf("Could not perform requested operation on type %s", valueType), http.StatusNotImplemented}
 	}
 }

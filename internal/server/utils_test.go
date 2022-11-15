@@ -2,12 +2,13 @@ package server
 
 import (
 	"errors"
-	"logogger/internal/schema"
-	"logogger/internal/storage"
 	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"logogger/internal/schema"
+	"logogger/internal/storage"
 )
 
 type okWriter struct {
@@ -46,7 +47,7 @@ func TestSafeWrite(t *testing.T) {
 
 func TestWriteError(t *testing.T) {
 	errorMap := map[error]int{
-		&requestError{http.StatusTeapot, ""}:                     http.StatusTeapot,
+		&requestError{"", http.StatusTeapot}:                     http.StatusTeapot,
 		ValidationError(""):                                      http.StatusBadRequest,
 		&storage.NotFound{ID: ""}:                                http.StatusNotFound,
 		&storage.IncrementingNonCounterMetrics{ActualType: ""}:   http.StatusNotImplemented,

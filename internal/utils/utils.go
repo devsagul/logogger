@@ -1,7 +1,9 @@
+// Package utils implements different project-wide utils
 package utils
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"time"
 )
@@ -31,4 +33,17 @@ func RetryForever(g errGoroutine, t time.Duration) goroutine {
 			err = g()
 		}
 	}
+}
+
+func coalesceString(s string, val string) string {
+	if s != "" {
+		return s
+	}
+	return val
+}
+
+func PrintVersionInfo(buildVersion, buildDate, buildCommit string) {
+	fmt.Printf("Build version: %s", coalesceString(buildVersion, "N/A"))
+	fmt.Printf("Build date: %s", coalesceString(buildVersion, "N/A"))
+	fmt.Printf("Build commit: %s", coalesceString(buildVersion, "N/A"))
 }

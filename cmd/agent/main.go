@@ -1,29 +1,36 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
-	"logogger/internal/poller"
-	"logogger/internal/reporter"
-	"logogger/internal/schema"
-	"logogger/internal/utils"
 	"os"
 	"os/signal"
 	"regexp"
 	"syscall"
 	"time"
 
+	"github.com/caarlos0/env/v6"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/caarlos0/env/v6"
+	"logogger/internal/poller"
+	"logogger/internal/reporter"
+	"logogger/internal/schema"
+	"logogger/internal/utils"
+)
+
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
 )
 
 type config struct {
-	PollInterval   time.Duration `env:"POLL_INTERVAL"`
-	ReportInterval time.Duration `env:"REPORT_INTERVAL"`
 	ReportHost     string        `env:"ADDRESS"`
 	Key            string        `env:"KEY"`
+	PollInterval   time.Duration `env:"POLL_INTERVAL"`
+	ReportInterval time.Duration `env:"REPORT_INTERVAL"`
 }
 
 var cfg config
@@ -36,6 +43,7 @@ func init() {
 }
 
 func main() {
+	utils.PrintVersionInfo(buildVersion, buildDate, buildCommit)
 	flag.Parse()
 	err := env.Parse(&cfg)
 	if err != nil {
@@ -52,7 +60,8 @@ func main() {
 
 	pollTicker := time.NewTicker(cfg.PollInterval)
 	reportTicker := time.NewTicker(cfg.ReportInterval)
-	p, err := poller.NewPoller(0)
+	ctx := context.Background()
+	p, err := poller.NewPoller(ctx, 0)
 	if err != nil {
 		log.Println("Could not initialize poller")
 		os.Exit(1)
@@ -63,7 +72,7 @@ func main() {
 	go utils.RetryForever(utils.WrapGoroutinePanic(func() error {
 		for {
 			<-pollTicker.C
-			l, err := p.Poll()
+			l, err := p.Poll(ctx)
 			if err != nil {
 				log.Println("Unable to poll data")
 				time.Sleep(time.Second)
@@ -79,7 +88,7 @@ func main() {
 			<-reportTicker.C
 			err := report(metrics, reportHost, cfg.Key)
 			if err == nil {
-				err = p.Reset()
+				err = p.Reset(ctx)
 				if err != nil {
 					log.Println("Unable to reset PollCount")
 				}

@@ -2,15 +2,16 @@ package dumper
 
 import (
 	"encoding/json"
-	"logogger/internal/schema"
 	"os"
 	"sync"
+
+	"logogger/internal/schema"
 )
 
 type SyncDumper struct {
+	filename string
 	wg       sync.WaitGroup
 	mu       sync.Mutex
-	filename string
 }
 
 func (d *SyncDumper) Dump(l []schema.Metrics) error {

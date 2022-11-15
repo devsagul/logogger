@@ -1,3 +1,4 @@
+// Package reporter implements agent-side logic for sending reports to server
 package reporter
 
 import (
@@ -5,19 +6,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"logogger/internal/schema"
-	"logogger/internal/utils"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
+
+	"logogger/internal/schema"
+	"logogger/internal/utils"
 )
 
 type ServerResponse struct {
-	url  string
 	resp *http.Response
 	err  error
+	url  string
 	dur  time.Duration
 }
 

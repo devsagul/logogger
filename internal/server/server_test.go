@@ -2,36 +2,38 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"logogger/internal/schema"
-	"logogger/internal/storage"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"logogger/internal/schema"
+	"logogger/internal/storage"
 )
 
 func TestApp_RetrieveValue(t *testing.T) {
 	store := storage.NewMemStorage()
-	err := store.Put(schema.NewCounter("ctrID", 42))
+	err := store.Put(context.Background(), schema.NewCounter("ctrID", 42))
 	assert.NoError(t, err)
 	app := NewApp(store)
 
 	params := []struct {
 		t     schema.MetricsType
 		id    string
-		code  int
 		body  string
+		code  int
 		exact bool
 	}{
-		{schema.MetricsTypeCounter, "ctrID", http.StatusOK, "42", true},
-		{schema.MetricsTypeGauge, "ctrID", http.StatusConflict, "actual type in storage is counter", false},
-		{schema.MetricsTypeCounter, "nonExistent", http.StatusNotFound, "Could not find metrics", false},
-		{"stats", "nonExistent", http.StatusNotImplemented, "Could not perform requested operation", false},
+		{schema.MetricsTypeCounter, "ctrID", "42", http.StatusOK, true},
+		{schema.MetricsTypeGauge, "ctrID", "actual type in storage is counter", http.StatusConflict, false},
+		{schema.MetricsTypeCounter, "nonExistent", "Could not find metrics", http.StatusNotFound, false},
+		{"stats", "nonExistent", "Could not perform requested operation", http.StatusNotImplemented, false},
 	}
 	for _, param := range params {
 		url := fmt.Sprintf("/value/%s/%s", param.t, param.id)
@@ -53,9 +55,9 @@ func TestApp_RetrieveValue(t *testing.T) {
 
 func TestApp_UpdateValue(t *testing.T) {
 	store := storage.NewMemStorage()
-	err := store.Put(schema.NewGauge("ggID", 13.37))
+	err := store.Put(context.Background(), schema.NewGauge("ggID", 13.37))
 	assert.NoError(t, err)
-	err = store.Put(schema.NewCounter("ctrID", 42))
+	err = store.Put(context.Background(), schema.NewCounter("ctrID", 42))
 	assert.NoError(t, err)
 	app := NewApp(store)
 
@@ -80,12 +82,12 @@ func TestApp_UpdateValue(t *testing.T) {
 		responseCode := recorder.Code
 		body := recorder.Body.String()
 		if param.t == "gauge" {
-			stored, err := store.Extract(schema.NewGaugeRequest(param.id))
+			stored, err := store.Extract(context.Background(), schema.NewGaugeRequest(param.id))
 			assert.NoError(t, err)
 			actual := *stored.Value
 			assert.Equal(t, param.value, actual)
 		} else {
-			stored, err := store.Extract(schema.NewCounterRequest(param.id))
+			stored, err := store.Extract(context.Background(), schema.NewCounterRequest(param.id))
 			assert.NoError(t, err)
 			actual := *stored.Delta
 			assert.Equal(t, param.delta, actual)
@@ -128,9 +130,9 @@ func TestApp_ListMetricsEmpty(t *testing.T) {
 
 func TestApp_ListMetrics(t *testing.T) {
 	store := storage.NewMemStorage()
-	err := store.Put(schema.NewCounter("ctrID", 42))
+	err := store.Put(context.Background(), schema.NewCounter("ctrID", 42))
 	assert.NoError(t, err)
-	err = store.Put(schema.NewGauge("ggID", 13.37))
+	err = store.Put(context.Background(), schema.NewGauge("ggID", 13.37))
 	assert.NoError(t, err)
 	app := NewApp(store)
 	req, err := http.NewRequest(http.MethodGet, "/", nil)
@@ -324,17 +326,17 @@ func TestApp_RetrieveValueJSON(t *testing.T) {
 	m := schema.NewCounter("ctrID", 42)
 	marshalled, err := json.Marshal(m)
 	assert.NoError(t, err)
-	err = store.Put(m)
+	err = store.Put(context.Background(), m)
 	assert.NoError(t, err)
 
 	params := [...]struct {
 		request schema.Metrics
-		code    int
 		needle  string
+		code    int
 	}{
-		{schema.NewCounterRequest("nonExistent"), http.StatusNotFound, "Could not find"},
-		{schema.NewCounterRequest("ctrID"), http.StatusOK, string(marshalled)},
-		{schema.NewGaugeRequest("ctrID"), http.StatusConflict, "actual type in storage is counter"},
+		{schema.NewCounterRequest("nonExistent"), "Could not find", http.StatusNotFound},
+		{schema.NewCounterRequest("ctrID"), string(marshalled), http.StatusOK},
+		{schema.NewGaugeRequest("ctrID"), "actual type in storage is counter", http.StatusConflict},
 	}
 
 	for _, param := range params {
@@ -447,31 +449,31 @@ Mocks used for specific tests
 // It is useful to have one for tests.
 type faultyStorage struct{}
 
-func (faultyStorage) Put(req schema.Metrics) error {
+func (faultyStorage) Put(_ context.Context, req schema.Metrics) error {
 	return errors.New("generic error")
 }
 
-func (faultyStorage) Extract(req schema.Metrics) (schema.Metrics, error) {
+func (faultyStorage) Extract(_ context.Context, req schema.Metrics) (schema.Metrics, error) {
 	return schema.NewEmptyMetrics(), errors.New("generic error")
 }
 
-func (faultyStorage) Increment(req schema.Metrics, value int64) error {
+func (faultyStorage) Increment(_ context.Context, req schema.Metrics, value int64) error {
 	return errors.New("generic error")
 }
 
-func (faultyStorage) List() ([]schema.Metrics, error) {
+func (faultyStorage) List(_ context.Context) ([]schema.Metrics, error) {
 	return []schema.Metrics{}, errors.New("generic error")
 }
 
-func (faultyStorage) BulkPut([]schema.Metrics) error {
+func (faultyStorage) BulkPut(_ context.Context, metrics []schema.Metrics) error {
 	return errors.New("generic error")
 }
 
-func (faultyStorage) BulkUpdate(counters []schema.Metrics, gauges []schema.Metrics) error {
+func (faultyStorage) BulkUpdate(_ context.Context, counters []schema.Metrics, gauges []schema.Metrics) error {
 	return errors.New("generic error")
 }
 
-func (faultyStorage) Ping() error {
+func (faultyStorage) Ping(_ context.Context) error {
 	return errors.New("generic error")
 }
 

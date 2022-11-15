@@ -1,3 +1,4 @@
+// Package schema defines a structure of messages
 package schema
 
 import (
