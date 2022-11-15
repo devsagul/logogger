@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"io"
@@ -102,7 +103,7 @@ func main() {
 				log.Fatal("Could not restore data : ", err_)
 			}
 
-			err_ = store.BulkPut(l)
+			err_ = store.BulkPut(context.Background(), l)
 			if err_ != nil {
 				log.Fatal("Could not save restored data : ", err_)
 			}

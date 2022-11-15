@@ -22,14 +22,14 @@ type MemStorage struct {
 	sync.Mutex
 }
 
-func (storage *MemStorage) Put(req schema.Metrics) error {
+func (storage *MemStorage) Put(_ context.Context, req schema.Metrics) error {
 	storage.Lock()
 	defer storage.Unlock()
 	storage.m[req.ID] = req
 	return nil
 }
 
-func (storage *MemStorage) Extract(req schema.Metrics) (schema.Metrics, error) {
+func (storage *MemStorage) Extract(_ context.Context, req schema.Metrics) (schema.Metrics, error) {
 	// Note: this extract should not be re-used in other
 	// methods, this would require a recursive mutex
 	storage.Lock()
@@ -44,7 +44,7 @@ func (storage *MemStorage) Extract(req schema.Metrics) (schema.Metrics, error) {
 	return value, nil
 }
 
-func (storage *MemStorage) Increment(req schema.Metrics, value int64) error {
+func (storage *MemStorage) Increment(_ context.Context, req schema.Metrics, value int64) error {
 	if req.MType != schema.MetricsTypeCounter {
 		return incrementingNonCounterMetrics(req.ID, req.MType)
 	}
@@ -75,7 +75,7 @@ func (storage *MemStorage) Increment(req schema.Metrics, value int64) error {
 	return nil
 }
 
-func (storage *MemStorage) List() ([]schema.Metrics, error) {
+func (storage *MemStorage) List(_ context.Context) ([]schema.Metrics, error) {
 	var res []schema.Metrics
 
 	for _, value := range storage.m {
@@ -89,7 +89,7 @@ func (storage *MemStorage) List() ([]schema.Metrics, error) {
 	return res, nil
 }
 
-func (storage *MemStorage) BulkPut(values []schema.Metrics) error {
+func (storage *MemStorage) BulkPut(_ context.Context, values []schema.Metrics) error {
 	storage.Lock()
 	defer storage.Unlock()
 	for _, req := range values {
@@ -98,7 +98,7 @@ func (storage *MemStorage) BulkPut(values []schema.Metrics) error {
 	return nil
 }
 
-func (storage *MemStorage) BulkUpdate(counters []schema.Metrics, gauges []schema.Metrics) error {
+func (storage *MemStorage) BulkUpdate(_ context.Context, counters []schema.Metrics, gauges []schema.Metrics) error {
 	storage.Lock()
 	defer storage.Unlock()
 	for _, counter := range counters {
@@ -115,16 +115,12 @@ func (storage *MemStorage) BulkUpdate(counters []schema.Metrics, gauges []schema
 	return nil
 }
 
-func (*MemStorage) Ping() error {
+func (*MemStorage) Ping(_ context.Context) error {
 	return nil
 }
 
 func (*MemStorage) Close() error {
 	return nil
-}
-
-func (storage *MemStorage) WithContext(ctx context.Context) MetricsStorage {
-	return storage
 }
 
 func NewMemStorage() *MemStorage {

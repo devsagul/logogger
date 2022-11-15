@@ -1,6 +1,7 @@
 package reporter
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -15,12 +16,12 @@ import (
 )
 
 func TestReportMetrics(t *testing.T) {
-	p, err := poller.NewPoller(0)
+	p, err := poller.NewPoller(context.Background(), 0)
 	if err != nil {
 		t.Fatalf("Error accessing storage.")
 	}
 
-	l, err := p.Poll()
+	l, err := p.Poll(context.Background())
 	if err != nil {
 		t.Fatalf("Error polling data.")
 	}
@@ -83,12 +84,12 @@ func TestReportMetrics(t *testing.T) {
 }
 
 func TestReportMetrics_FaultyServer(t *testing.T) {
-	p, err := poller.NewPoller(0)
+	p, err := poller.NewPoller(context.Background(), 0)
 	if err != nil {
 		assert.FailNow(t, "Error accessing storage.")
 	}
 
-	l, err := p.Poll()
+	l, err := p.Poll(context.Background())
 	if err != nil {
 		assert.FailNow(t, "Error polling data.")
 	}

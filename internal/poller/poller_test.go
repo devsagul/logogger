@@ -1,6 +1,7 @@
 package poller
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,11 +10,11 @@ import (
 )
 
 func extractCounter(t *testing.T, p Poller) int64 {
-	_, err := p.Poll()
+	_, err := p.Poll(context.Background())
 	if err != nil {
 		assert.FailNow(t, "Error accessing storage.")
 	}
-	value, err := p.store.Extract(schema.NewCounterRequest("PollCount"))
+	value, err := p.store.Extract(context.Background(), schema.NewCounterRequest("PollCount"))
 	if err != nil {
 		assert.FailNow(t, "Error accessing storage.")
 	}
@@ -21,14 +22,14 @@ func extractCounter(t *testing.T, p Poller) int64 {
 }
 
 func TestPoller(t *testing.T) {
-	p, err := NewPoller(0)
+	p, err := NewPoller(context.Background(), 0)
 	if err != nil {
 		assert.FailNow(t, "Error accessing storage.")
 	}
 
 	c1 := extractCounter(t, p)
 	c2 := extractCounter(t, p)
-	err = p.Reset()
+	err = p.Reset(context.Background())
 	if err != nil {
 		assert.FailNow(t, "Error resetting poller.")
 	}

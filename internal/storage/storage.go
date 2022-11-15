@@ -8,13 +8,12 @@ import (
 )
 
 type MetricsStorage interface {
-	Put(value schema.Metrics) error
-	Extract(req schema.Metrics) (schema.Metrics, error)
-	Increment(req schema.Metrics, value int64) error
-	List() ([]schema.Metrics, error)
-	BulkPut(values []schema.Metrics) error
-	BulkUpdate(counters []schema.Metrics, gauges []schema.Metrics) error
-	Ping() error
+	Put(ctx context.Context, value schema.Metrics) error
+	Extract(ctx context.Context, req schema.Metrics) (schema.Metrics, error)
+	Increment(ctx context.Context, req schema.Metrics, value int64) error
+	List(ctx context.Context) ([]schema.Metrics, error)
+	BulkPut(ctx context.Context, values []schema.Metrics) error
+	BulkUpdate(ctx context.Context, counters []schema.Metrics, gauges []schema.Metrics) error
+	Ping(ctx context.Context) error
 	Close() error
-	WithContext(ctx context.Context) MetricsStorage
 }

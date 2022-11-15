@@ -2,6 +2,7 @@
 package poller
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -57,20 +58,20 @@ type Poller struct {
 	start int64
 }
 
-func NewPoller(start int64) (Poller, error) {
+func NewPoller(ctx context.Context, start int64) (Poller, error) {
 	store := storage.NewMemStorage()
-	err := store.Put(schema.NewCounter(pollCount, start))
+	err := store.Put(ctx, schema.NewCounter(pollCount, start))
 	return Poller{store, start}, err
 }
 
-func (p Poller) Poll() ([]schema.Metrics, error) {
-	err := p.store.Increment(schema.NewCounterRequest(pollCount), 1)
+func (p Poller) Poll(ctx context.Context) ([]schema.Metrics, error) {
+	err := p.store.Increment(ctx, schema.NewCounterRequest(pollCount), 1)
 	if err != nil {
 		return nil, err
 	}
 
 	r := schema.NewGauge(randomValue, rand.Float64())
-	err = p.store.Put(r)
+	err = p.store.Put(ctx, r)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +91,7 @@ func (p Poller) Poll() ([]schema.Metrics, error) {
 			if err_ != nil {
 				return err_
 			}
-			err_ = p.store.Put(schema.NewGauge(stat, f))
+			err_ = p.store.Put(ctx, schema.NewGauge(stat, f))
 			return err_
 		}))
 	}
@@ -101,12 +102,12 @@ func (p Poller) Poll() ([]schema.Metrics, error) {
 			return err
 		}
 
-		err_ = p.store.Put(schema.NewGauge("TotalMemory", float64(v.Total)))
+		err_ = p.store.Put(ctx, schema.NewGauge("TotalMemory", float64(v.Total)))
 		if err_ != nil {
 			return err_
 		}
 
-		err_ = p.store.Put(schema.NewGauge("FreeMemory", float64(v.Free)))
+		err_ = p.store.Put(ctx, schema.NewGauge("FreeMemory", float64(v.Free)))
 		return err_
 	}))
 
@@ -118,7 +119,7 @@ func (p Poller) Poll() ([]schema.Metrics, error) {
 
 		for i, percent := range utilization {
 			id := fmt.Sprintf("CPUutilization%d", i)
-			err_ = p.store.Put(schema.NewGauge(id, percent))
+			err_ = p.store.Put(ctx, schema.NewGauge(id, percent))
 			if err_ != nil {
 				return err_
 			}
@@ -130,9 +131,9 @@ func (p Poller) Poll() ([]schema.Metrics, error) {
 	if err != nil {
 		return nil, err
 	}
-	return p.store.List()
+	return p.store.List(ctx)
 }
 
-func (p Poller) Reset() error {
-	return p.store.Put(schema.NewCounter(pollCount, p.start))
+func (p Poller) Reset(ctx context.Context) error {
+	return p.store.Put(ctx, schema.NewCounter(pollCount, p.start))
 }
