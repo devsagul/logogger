@@ -28,13 +28,15 @@ var (
 )
 
 type config struct {
-	Address       string        `env:"ADDRESS"`
-	CryptoKey     string        `env:"CRYPTO_KEY"`
-	StoreFile     string        `env:"STORE_FILE"`
-	Key           string        `env:"KEY"`
-	DatabaseDSN   string        `env:"DATABASE_DSN"`
-	StoreInterval time.Duration `env:"STORE_INTERVAL"`
-	Restore       bool          `env:"RESTORE"`
+	RawStoreInterval string        `json:"store_interval"`
+	Address          string        `env:"ADDRESS" json:"address"`
+	ConfigFilePath   string        `enc:"CONFIG"`
+	CryptoKey        string        `env:"CRYPTO_KEY" json:"crypto_key"`
+	StoreFile        string        `env:"STORE_FILE" json:"store_file"`
+	Key              string        `env:"KEY" json:"key"`
+	DatabaseDSN      string        `env:"DATABASE_DSN" json:"database_dsn"`
+	StoreInterval    time.Duration `env:"STORE_INTERVAL"`
+	Restore          bool          `env:"RESTORE" json:"restore"`
 }
 
 var cfg config
@@ -47,14 +49,36 @@ func init() {
 	flag.BoolVar(&cfg.Restore, "r", true, "Restore store state from dump file on server initialization")
 	flag.StringVar(&cfg.Key, "k", "", "Secret key to sign metrics (should be shared between server and agent)")
 	flag.StringVar(&cfg.DatabaseDSN, "d", "", "Database connection string")
+	flag.StringVar(&cfg.ConfigFilePath, "c", "", "Path to JSON configuration")
 }
 
 func main() {
 	utils.PrintVersionInfo(buildVersion, buildDate, buildCommit)
 	log.Println("Initializing server...")
-	log.Printf("%v", os.Args)
 	flag.Parse()
 	err := env.Parse(&cfg)
+	if err != nil {
+		log.Fatal("Could not parse config : ", err)
+	}
+
+	if len(cfg.ConfigFilePath) > 0 {
+		data, err := os.ReadFile(cfg.ConfigFilePath)
+		if err != nil {
+			log.Fatal("Could not read config file : ", err)
+		}
+		err = json.Unmarshal(data, &cfg)
+		if err != nil {
+			log.Fatal("Could not parse config file : ", err)
+		}
+		cfg.StoreInterval, err = time.ParseDuration(cfg.RawStoreInterval)
+		if err != nil {
+			log.Fatal("Could not parse config file : ", err)
+		}
+	}
+
+	// do it again to preserve order
+	flag.Parse()
+	err = env.Parse(&cfg)
 	if err != nil {
 		log.Fatal("Could not parse config : ", err)
 	}

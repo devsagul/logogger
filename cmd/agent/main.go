@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -28,11 +29,14 @@ var (
 )
 
 type config struct {
-	CryptoKey      string        `env:"CRYPTO_KEY"`
-	ReportHost     string        `env:"ADDRESS"`
-	Key            string        `env:"KEY"`
-	PollInterval   time.Duration `env:"POLL_INTERVAL"`
-	ReportInterval time.Duration `env:"REPORT_INTERVAL"`
+	RawPollInterval   string        `json:"poll_interval"`
+	RawReportInterval string        `json:"report_interval"`
+	ConfigFilePath    string        `enc:"CONFIG"`
+	CryptoKey         string        `env:"CRYPTO_KEY" json:"crypto_key"`
+	ReportHost        string        `env:"ADDRESS" json:"report_host"`
+	Key               string        `env:"KEY" json:"key"`
+	PollInterval      time.Duration `env:"POLL_INTERVAL"`
+	ReportInterval    time.Duration `env:"REPORT_INTERVAL"`
 }
 
 var cfg config
@@ -49,6 +53,33 @@ func main() {
 	utils.PrintVersionInfo(buildVersion, buildDate, buildCommit)
 	flag.Parse()
 	err := env.Parse(&cfg)
+	if err != nil {
+		log.Println("Could not parse config")
+		os.Exit(1)
+	}
+
+	if len(cfg.ConfigFilePath) > 0 {
+		data, err := os.ReadFile(cfg.ConfigFilePath)
+		if err != nil {
+			log.Fatal("Could not read config file : ", err)
+		}
+		err = json.Unmarshal(data, &cfg)
+		if err != nil {
+			log.Fatal("Could not parse config file : ", err)
+		}
+		cfg.PollInterval, err = time.ParseDuration(cfg.RawPollInterval)
+		if err != nil {
+			log.Fatal("Could not parse config file : ", err)
+		}
+		cfg.ReportInterval, err = time.ParseDuration(cfg.RawReportInterval)
+		if err != nil {
+			log.Fatal("Could not parse config file : ", err)
+		}
+	}
+
+	// preserve order
+	flag.Parse()
+	err = env.Parse(&cfg)
 	if err != nil {
 		log.Println("Could not parse config")
 		os.Exit(1)
