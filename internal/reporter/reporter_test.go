@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"logogger/internal/crypt"
 	"logogger/internal/poller"
 	"logogger/internal/schema"
 )
@@ -72,7 +73,9 @@ func TestReportMetrics(t *testing.T) {
 
 	server := httptest.NewServer(handler)
 	defer server.Close()
-	err = ReportMetrics(l, server.URL)
+	encryptor, err := crypt.NewEncryptor("")
+	assert.NoError(t, err)
+	err = ReportMetrics(l, server.URL, encryptor)
 
 	if err != nil {
 		assert.FailNow(t, "Error reporting data.")
@@ -100,10 +103,12 @@ func TestReportMetrics_FaultyServer(t *testing.T) {
 		writer.WriteHeader(http.StatusInternalServerError)
 	})
 	server := httptest.NewServer(handler)
+	encryptor, err := crypt.NewEncryptor("")
+	assert.NoError(t, err)
 
-	err1 := ReportMetrics(l, server.URL)
+	err1 := ReportMetrics(l, server.URL, encryptor)
 	server.Close()
-	err2 := ReportMetrics(l, server.URL)
+	err2 := ReportMetrics(l, server.URL, encryptor)
 
 	assert.NotNil(t, err1)
 	assert.NotNil(t, err2)

@@ -13,6 +13,7 @@ import (
 
 	"github.com/caarlos0/env/v6"
 
+	"logogger/internal/crypt"
 	"logogger/internal/dumper"
 	"logogger/internal/schema"
 	"logogger/internal/server"
@@ -28,6 +29,7 @@ var (
 
 type config struct {
 	Address       string        `env:"ADDRESS"`
+	CryptoKey     string        `env:"CRYPTO_KEY"`
 	StoreFile     string        `env:"STORE_FILE"`
 	Key           string        `env:"KEY"`
 	DatabaseDSN   string        `env:"DATABASE_DSN"`
@@ -39,6 +41,7 @@ var cfg config
 
 func init() {
 	flag.StringVar(&cfg.Address, "a", "localhost:8080", "Address of the server (to listen to)")
+	flag.StringVar(&cfg.CryptoKey, "crypto-key", "", "Path to file with private encryption key")
 	flag.DurationVar(&cfg.StoreInterval, "i", 300*time.Second, "Interval for storage state to be dumped on disk")
 	flag.StringVar(&cfg.StoreFile, "f", "/tmp/devops-metrics-db.json", "Path to the file for dumping storage state")
 	flag.BoolVar(&cfg.Restore, "r", true, "Restore store state from dump file on server initialization")
@@ -59,6 +62,12 @@ func main() {
 		log.Fatal("Invalid value for store interval")
 	}
 	log.Printf("DSN: %v", cfg.DatabaseDSN)
+
+	decryptor, err := crypt.NewDecryptor(cfg.CryptoKey)
+	if err != nil {
+		log.Println("Could not setup encryption")
+		os.Exit(1)
+	}
 
 	var store storage.MetricsStorage
 	if cfg.DatabaseDSN != "" {
@@ -126,7 +135,7 @@ func main() {
 	}()
 
 	log.Println("Initializing application...")
-	app := server.NewApp(store).WithDumper(d).WithDumpInterval(cfg.StoreInterval).WithKey(cfg.Key)
+	app := server.NewApp(store).WithDumper(d).WithDumpInterval(cfg.StoreInterval).WithKey(cfg.Key).WithDecryptor(decryptor)
 	log.Println("Listening...")
 	err = http.ListenAndServe(cfg.Address, app.Router)
 	if err != nil {

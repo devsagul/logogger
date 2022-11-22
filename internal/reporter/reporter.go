@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 
+	"logogger/internal/crypt"
 	"logogger/internal/schema"
 	"logogger/internal/utils"
 )
@@ -25,7 +26,7 @@ type ServerResponse struct {
 
 var batches = true
 
-func postRequest(url string, m schema.Metrics) error {
+func postRequest(url string, m schema.Metrics, encryptor crypt.Encryptor) error {
 	id, err := uuid.NewRandom()
 	if err != nil {
 		return err
@@ -36,6 +37,12 @@ func postRequest(url string, m schema.Metrics) error {
 	if err != nil {
 		return err
 	}
+
+	b, err = encryptor.Encrypt(b)
+	if err != nil {
+		return err
+	}
+
 	request, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
 	if err != nil {
 		return err
@@ -60,7 +67,7 @@ func postRequest(url string, m schema.Metrics) error {
 	return err
 }
 
-func postBatchRequest(url string, l []schema.Metrics) (int, error) {
+func postBatchRequest(url string, l []schema.Metrics, encryptor crypt.Encryptor) (int, error) {
 	id, err := uuid.NewRandom()
 	if err != nil {
 		return 0, err
@@ -71,6 +78,12 @@ func postBatchRequest(url string, l []schema.Metrics) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+
+	b, err = encryptor.Encrypt(b)
+	if err != nil {
+		return 0, err
+	}
+
 	request, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
 	if err != nil {
 		return 0, err
@@ -97,27 +110,27 @@ func postBatchRequest(url string, l []schema.Metrics) (int, error) {
 	return code, nil
 }
 
-func ReportMetrics(l []schema.Metrics, host string) error {
+func ReportMetrics(l []schema.Metrics, host string, encryptor crypt.Encryptor) error {
 	eg := &errgroup.Group{}
 
 	for _, m := range l {
 		m := m
 		url := fmt.Sprintf("%s/update/", host)
 		eg.Go(utils.WrapGoroutinePanic(func() error {
-			return postRequest(url, m)
+			return postRequest(url, m, encryptor)
 		}))
 	}
 
 	return eg.Wait()
 }
 
-func ReportMetricsBatches(l []schema.Metrics, host string) error {
+func ReportMetricsBatches(l []schema.Metrics, host string, encryptor crypt.Encryptor) error {
 	if batches {
 		if len(l) == 0 {
 			return nil
 		}
 		url := fmt.Sprintf("%s/updates/", host)
-		code, err := postBatchRequest(url, l)
+		code, err := postBatchRequest(url, l, encryptor)
 		if code == http.StatusNotFound {
 			// if the server can't handle /updates URL, we should
 			// use standard handle
@@ -126,5 +139,5 @@ func ReportMetricsBatches(l []schema.Metrics, host string) error {
 			return err
 		}
 	}
-	return ReportMetrics(l, host)
+	return ReportMetrics(l, host, encryptor)
 }

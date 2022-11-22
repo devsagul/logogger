@@ -14,6 +14,7 @@ import (
 	"github.com/caarlos0/env/v6"
 	"golang.org/x/sync/errgroup"
 
+	"logogger/internal/crypt"
 	"logogger/internal/poller"
 	"logogger/internal/reporter"
 	"logogger/internal/schema"
@@ -27,6 +28,7 @@ var (
 )
 
 type config struct {
+	CryptoKey      string        `env:"CRYPTO_KEY"`
 	ReportHost     string        `env:"ADDRESS"`
 	Key            string        `env:"KEY"`
 	PollInterval   time.Duration `env:"POLL_INTERVAL"`
@@ -38,6 +40,7 @@ var cfg config
 func init() {
 	flag.DurationVar(&cfg.PollInterval, "p", 2*time.Second, "Interval of metrics polling")
 	flag.DurationVar(&cfg.ReportInterval, "r", 10*time.Second, "Interval of metrics reporting")
+	flag.StringVar(&cfg.CryptoKey, "crypto-key", "", "Path to file with public encryption key")
 	flag.StringVar(&cfg.ReportHost, "a", "localhost:8080", "Address of the server to report metrics to")
 	flag.StringVar(&cfg.Key, "k", "", "Secret key to sign metrics (should be shared between server and agent)")
 }
@@ -48,6 +51,12 @@ func main() {
 	err := env.Parse(&cfg)
 	if err != nil {
 		log.Println("Could not parse config")
+		os.Exit(1)
+	}
+
+	encryptor, err := crypt.NewEncryptor(cfg.CryptoKey)
+	if err != nil {
+		log.Println("Could not setup encryption")
 		os.Exit(1)
 	}
 
@@ -86,7 +95,7 @@ func main() {
 	go utils.RetryForever(utils.WrapGoroutinePanic(func() error {
 		for {
 			<-reportTicker.C
-			err := report(metrics, reportHost, cfg.Key)
+			err := report(metrics, reportHost, cfg.Key, encryptor)
 			if err == nil {
 				err = p.Reset(ctx)
 				if err != nil {
@@ -105,7 +114,7 @@ func main() {
 	log.Println("Exiting agent gracefully...")
 }
 
-func report(l []schema.Metrics, host string, key string) error {
+func report(l []schema.Metrics, host string, key string, encryptor crypt.Encryptor) error {
 	if key != "" {
 		eg := errgroup.Group{}
 		var signed []schema.Metrics
@@ -126,6 +135,6 @@ func report(l []schema.Metrics, host string, key string) error {
 		l = signed
 	}
 
-	err := reporter.ReportMetricsBatches(l, host)
+	err := reporter.ReportMetricsBatches(l, host, encryptor)
 	return err
 }

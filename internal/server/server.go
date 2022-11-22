@@ -15,17 +15,19 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"logogger/internal/crypt"
 	"logogger/internal/dumper"
 	"logogger/internal/schema"
 	"logogger/internal/storage"
 )
 
 type App struct {
-	store  storage.MetricsStorage
-	dumper dumper.Dumper
-	Router *chi.Mux
-	key    string
-	sync   bool
+	store     storage.MetricsStorage
+	decryptor crypt.Decryptor
+	dumper    dumper.Dumper
+	Router    *chi.Mux
+	key       string
+	sync      bool
 }
 
 type errorHTTPHandler func(http.ResponseWriter, *http.Request) error
@@ -438,5 +440,10 @@ func (app *App) WithDumpInterval(interval time.Duration) *App {
 
 func (app *App) WithKey(key string) *App {
 	app.key = key
+	return app
+}
+
+func (app *App) WithDecryptor(d crypt.Decryptor) *App {
+	app.Router.Use(decryptorMiddleware(d))
 	return app
 }

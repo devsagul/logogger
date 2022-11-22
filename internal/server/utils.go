@@ -1,11 +1,15 @@
 package server
 
 import (
+	"bytes"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"strconv"
 
+	"logogger/internal/crypt"
 	"logogger/internal/schema"
 	"logogger/internal/storage"
 )
@@ -65,5 +69,29 @@ func ParseMetric(valueType string, name string, rawValue string) (schema.Metrics
 		return schema.NewGauge(name, value), nil
 	default:
 		return schema.NewEmptyMetrics(), &requestError{fmt.Sprintf("Could not perform requested operation on type %s", valueType), http.StatusNotImplemented}
+	}
+}
+
+func decryptorMiddleware(d crypt.Decryptor) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			data, err := io.ReadAll(r.Body)
+			if err != nil {
+				log.Printf("ERROR: %+v", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			data, err = d.Decrypt(data)
+			if err != nil {
+				log.Printf("ERROR: %+v", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			r.Body = ioutil.NopCloser(bytes.NewReader(data))
+			r.ContentLength = int64(len(data))
+
+			next.ServeHTTP(w, r)
+		})
 	}
 }
