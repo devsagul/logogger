@@ -394,8 +394,6 @@ func TestApp_UpdateValueJSON(t *testing.T) {
 		code    int
 	}{
 		{[]schema.Metrics{schema.NewCounterRequest("nonExistent")}, "{\"id\":\"ctrID\",\"type\":\"counter\",\"delta\":42}", http.StatusOK},
-		//{[]schema.Metrics{schema.NewCounterRequest("ctrID")}, string(marshalled), http.StatusOK},
-		//{[]schema.Metrics{schema.NewGaugeRequest("ctrID")}, "actual type in storage is counter", http.StatusConflict},
 	}
 
 	for _, param := range params {
