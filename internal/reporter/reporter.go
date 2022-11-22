@@ -19,13 +19,6 @@ import (
 	"logogger/internal/utils"
 )
 
-type ServerResponse struct {
-	resp *http.Response
-	err  error
-	url  string
-	dur  time.Duration
-}
-
 type Poller struct {
 	batches   bool
 	wg        sync.WaitGroup

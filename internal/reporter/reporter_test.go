@@ -115,3 +115,68 @@ func TestReportMetrics_FaultyServer(t *testing.T) {
 	assert.NotNil(t, err1)
 	assert.NotNil(t, err2)
 }
+
+func TestReportBatchMetrics(t *testing.T) {
+	p, err := poller.NewPoller(context.Background(), 0)
+	if err != nil {
+		t.Fatalf("Error accessing storage.")
+	}
+
+	l, err := p.Poll(context.Background())
+	if err != nil {
+		t.Fatalf("Error polling data.")
+	}
+
+	reported := map[string]bool{}
+
+	// fill the reported set by inspecting Metrics struct
+	for _, m := range poller.SysMetrics {
+		reported[m] = false
+	}
+	reported["RandomValue"] = false
+	reported["PollCount"] = false
+
+	handler := http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		url := request.URL.String()
+
+		assert.Equal(t, "/updates/", url)
+
+		var m []schema.Metrics
+		err_ := json.NewDecoder(request.Body).Decode(&m)
+
+		assert.NoError(t, err_)
+		if err_ != nil {
+			t.Fatalf("Error decoding metrics.")
+		}
+
+		for _, value := range m {
+			name := value.ID
+			tField := value.MType
+			reported[name] = true
+
+			switch tField {
+			case "counter":
+				assert.NotNil(t, value.Delta)
+			case "gauge":
+				assert.NotNil(t, value.Value)
+			default:
+				t.Fatalf("Unknown metrics type %s", tField)
+			}
+		}
+	})
+
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	encryptor, err := crypt.NewEncryptor("")
+	assert.NoError(t, err)
+	poller := NewPoller(encryptor)
+	err = poller.ReportMetricsBatches(l, server.URL)
+
+	if err != nil {
+		assert.FailNow(t, "Error reporting data.")
+	}
+
+	for _, value := range reported {
+		assert.True(t, value)
+	}
+}

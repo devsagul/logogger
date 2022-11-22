@@ -14,9 +14,9 @@ type Decryptor interface {
 	Decrypt([]byte) ([]byte, error)
 }
 
-type noopDecryptor struct{}
+type NoOpDecryptor struct{}
 
-func (noopDecryptor) Decrypt(message []byte) ([]byte, error) {
+func (NoOpDecryptor) Decrypt(message []byte) ([]byte, error) {
 	return message, nil
 }
 
@@ -42,7 +42,7 @@ func privateKeyFromBytes(raw []byte) (*rsa.PrivateKey, error) {
 
 func NewDecryptor(path string) (Decryptor, error) {
 	if len(path) == 0 {
-		return noopDecryptor{}, nil
+		return NoOpDecryptor{}, nil
 	}
 
 	bytes, err := os.ReadFile(path)

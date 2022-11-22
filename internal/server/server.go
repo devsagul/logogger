@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
@@ -32,10 +33,30 @@ type App struct {
 
 type errorHTTPHandler func(http.ResponseWriter, *http.Request) error
 
-func newHandler(handler errorHTTPHandler) http.HandlerFunc {
+func (app *App) newHandler(handler errorHTTPHandler) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		errChan := make(chan error)
 		ctx := request.Context()
+
+		if request.Body != nil {
+			data, err := io.ReadAll(request.Body)
+			if err != nil {
+				log.Printf("ERROR: %+v", err)
+				writer.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			if data != nil {
+				data, err = app.decryptor.Decrypt(data)
+				if err != nil {
+					log.Printf("ERROR: %+v", err)
+					writer.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+
+				request.Body = ioutil.NopCloser(bytes.NewReader(data))
+				request.ContentLength = int64(len(data))
+			}
+		}
 
 		go func() {
 			defer func() {
@@ -396,6 +417,7 @@ func NewApp(
 	app.store = store
 	app.dumper = dumper.NoOpDumper{}
 	app.sync = false
+	app.decryptor = crypt.NoOpDecryptor{}
 	app.key = ""
 
 	// useful middlewares
@@ -405,13 +427,13 @@ func NewApp(
 	r.Use(middleware.Timeout(60 * time.Second))
 	r.Use(middleware.Compress(5))
 
-	r.With(middleware.SetHeader("Content-Type", "text/plain")).Post("/update/{Type}/{Name}/{Value}", newHandler(app.updateValue))
-	r.With(middleware.SetHeader("Content-Type", "text/plain")).Get("/value/{Type}/{Name}", newHandler(app.retrieveValue))
-	r.With(middleware.SetHeader("Content-Type", "application/json")).Post("/update/", newHandler(app.updateValueJSON))
-	r.With(middleware.SetHeader("Content-Type", "application/json")).Post("/updates/", newHandler(app.updateValuesJSON))
-	r.With(middleware.SetHeader("Content-Type", "application/json")).Post("/value/", newHandler(app.retrieveValueJSON))
-	r.With(middleware.SetHeader("Content-Type", "text/plain")).Get("/ping", newHandler(app.ping))
-	r.With(middleware.SetHeader("Content-Type", "text/html")).Get("/", newHandler(app.listMetrics))
+	r.With(middleware.SetHeader("Content-Type", "text/plain")).Post("/update/{Type}/{Name}/{Value}", app.newHandler(app.updateValue))
+	r.With(middleware.SetHeader("Content-Type", "text/plain")).Get("/value/{Type}/{Name}", app.newHandler(app.retrieveValue))
+	r.With(middleware.SetHeader("Content-Type", "application/json")).Post("/update/", app.newHandler(app.updateValueJSON))
+	r.With(middleware.SetHeader("Content-Type", "application/json")).Post("/updates/", app.newHandler(app.updateValuesJSON))
+	r.With(middleware.SetHeader("Content-Type", "application/json")).Post("/value/", app.newHandler(app.retrieveValueJSON))
+	r.With(middleware.SetHeader("Content-Type", "text/plain")).Get("/ping", app.newHandler(app.ping))
+	r.With(middleware.SetHeader("Content-Type", "text/html")).Get("/", app.newHandler(app.listMetrics))
 	return app
 }
 
@@ -443,7 +465,7 @@ func (app *App) WithKey(key string) *App {
 	return app
 }
 
-func (app *App) WithDecryptor(d crypt.Decryptor) *App {
-	app.Router.Use(decryptorMiddleware(d))
+func (app *App) WithDecryptor(decryptor crypt.Decryptor) *App {
+	app.decryptor = decryptor
 	return app
 }
