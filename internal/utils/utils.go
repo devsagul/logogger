@@ -43,7 +43,7 @@ func coalesceString(s string, val string) string {
 }
 
 func PrintVersionInfo(buildVersion, buildDate, buildCommit string) {
-	fmt.Printf("Build version: %s", coalesceString(buildVersion, "N/A"))
-	fmt.Printf("Build date: %s", coalesceString(buildVersion, "N/A"))
-	fmt.Printf("Build commit: %s", coalesceString(buildVersion, "N/A"))
+	fmt.Printf("Build version: %s\n", coalesceString(buildVersion, "N/A"))
+	fmt.Printf("Build date: %s\n", coalesceString(buildVersion, "N/A"))
+	fmt.Printf("Build commit: %s\n", coalesceString(buildVersion, "N/A"))
 }
