@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
@@ -53,7 +52,7 @@ func (app *App) newHandler(handler errorHTTPHandler) http.HandlerFunc {
 					return
 				}
 
-				request.Body = ioutil.NopCloser(bytes.NewReader(data))
+				request.Body = io.NopCloser(bytes.NewReader(data))
 				request.ContentLength = int64(len(data))
 			}
 		}
