@@ -19,15 +19,15 @@ import (
 	"logogger/internal/utils"
 )
 
-type Poller struct {
+type Reporter struct {
 	batches   bool
 	wg        sync.WaitGroup
 	encryptor crypt.Encryptor
 }
 
-func (poller *Poller) ReportMetrics(l []schema.Metrics, host string) error {
-	poller.wg.Add(1)
-	defer poller.wg.Done()
+func (reporter *Reporter) ReportMetrics(l []schema.Metrics, host string) error {
+	reporter.wg.Add(1)
+	defer reporter.wg.Done()
 
 	eg := &errgroup.Group{}
 
@@ -35,41 +35,41 @@ func (poller *Poller) ReportMetrics(l []schema.Metrics, host string) error {
 		m := m
 		url := fmt.Sprintf("%s/update/", host)
 		eg.Go(utils.WrapGoroutinePanic(func() error {
-			return postSingleRequest(url, m, poller.encryptor)
+			return postSingleRequest(url, m, reporter.encryptor)
 		}))
 	}
 
 	return eg.Wait()
 }
 
-func (poller *Poller) ReportMetricsBatches(l []schema.Metrics, host string) error {
-	poller.wg.Add(1)
-	defer poller.wg.Done()
+func (reporter *Reporter) ReportMetricsBatches(l []schema.Metrics, host string) error {
+	reporter.wg.Add(1)
+	defer reporter.wg.Done()
 
-	if !poller.batches {
-		return poller.ReportMetrics(l, host)
+	if !reporter.batches {
+		return reporter.ReportMetrics(l, host)
 	}
 
 	if len(l) == 0 {
 		return nil
 	}
 	url := fmt.Sprintf("%s/updates/", host)
-	code, err := postBatchRequest(url, l, poller.encryptor)
+	code, err := postBatchRequest(url, l, reporter.encryptor)
 
 	// if batches url is unavailable, we should use ordinary API
 	if code != http.StatusNotFound {
 		return err
 	}
-	poller.batches = false
-	return poller.ReportMetrics(l, host)
+	reporter.batches = false
+	return reporter.ReportMetrics(l, host)
 }
 
-func (poller *Poller) Shutdown() {
-	poller.wg.Wait()
+func (reporter *Reporter) Shutdown() {
+	reporter.wg.Wait()
 }
 
-func NewPoller(encryptor crypt.Encryptor) *Poller {
-	return &Poller{batches: true, encryptor: encryptor, wg: sync.WaitGroup{}}
+func NewReporter(encryptor crypt.Encryptor) *Reporter {
+	return &Reporter{batches: true, encryptor: encryptor, wg: sync.WaitGroup{}}
 }
 
 func postSingleRequest(url string, m schema.Metrics, encryptor crypt.Encryptor) error {

@@ -123,7 +123,7 @@ func main() {
 		}
 	}), time.Minute)()
 
-	reporter := reporter.NewPoller(encryptor)
+	reporter := reporter.NewReporter(encryptor)
 
 	go utils.RetryForever(utils.WrapGoroutinePanic(func() error {
 		for {
@@ -150,7 +150,7 @@ func main() {
 	reporter.Shutdown()
 }
 
-func report(poller *reporter.Poller, l []schema.Metrics, host string, key string) error {
+func report(poller *reporter.Reporter, l []schema.Metrics, host string, key string) error {
 	if key != "" {
 		eg := errgroup.Group{}
 		var signed []schema.Metrics
