@@ -25,7 +25,7 @@ type Reporter struct {
 	encryptor crypt.Encryptor
 }
 
-func (reporter *Reporter) ReportMetrics(l []schema.Metrics, host string) error {
+func (reporter *Reporter) ReportMetrics(ctx context.Context, l []schema.Metrics, host string) error {
 	reporter.wg.Add(1)
 	defer reporter.wg.Done()
 
@@ -35,33 +35,33 @@ func (reporter *Reporter) ReportMetrics(l []schema.Metrics, host string) error {
 		m := m
 		url := fmt.Sprintf("%s/update/", host)
 		eg.Go(utils.WrapGoroutinePanic(func() error {
-			return postSingleRequest(url, m, reporter.encryptor)
+			return postSingleRequest(ctx, url, m, reporter.encryptor)
 		}))
 	}
 
 	return eg.Wait()
 }
 
-func (reporter *Reporter) ReportMetricsBatches(l []schema.Metrics, host string) error {
+func (reporter *Reporter) ReportMetricsBatches(ctx context.Context, l []schema.Metrics, host string) error {
 	reporter.wg.Add(1)
 	defer reporter.wg.Done()
 
 	if !reporter.batches {
-		return reporter.ReportMetrics(l, host)
+		return reporter.ReportMetrics(ctx, l, host)
 	}
 
 	if len(l) == 0 {
 		return nil
 	}
 	url := fmt.Sprintf("%s/updates/", host)
-	code, err := postBatchRequest(url, l, reporter.encryptor)
+	code, err := postBatchRequest(ctx, url, l, reporter.encryptor)
 
 	// if batches url is unavailable, we should use ordinary API
 	if code != http.StatusNotFound {
 		return err
 	}
 	reporter.batches = false
-	return reporter.ReportMetrics(l, host)
+	return reporter.ReportMetrics(ctx, l, host)
 }
 
 func (reporter *Reporter) Shutdown() {
@@ -72,25 +72,25 @@ func NewReporter(encryptor crypt.Encryptor) *Reporter {
 	return &Reporter{batches: true, encryptor: encryptor, wg: sync.WaitGroup{}}
 }
 
-func postSingleRequest(url string, m schema.Metrics, encryptor crypt.Encryptor) error {
+func postSingleRequest(ctx context.Context, url string, m schema.Metrics, encryptor crypt.Encryptor) error {
 	data, err := json.Marshal(&m)
 	if err != nil {
 		return err
 	}
 
-	_, err = postRequest(context.TODO(), url, data, encryptor, map[string]string{
+	_, err = postRequest(ctx, url, data, encryptor, map[string]string{
 		"Content-Type": "application/json; charset=UTF-8",
 	})
 	return err
 }
 
-func postBatchRequest(url string, l []schema.Metrics, encryptor crypt.Encryptor) (int, error) {
+func postBatchRequest(ctx context.Context, url string, l []schema.Metrics, encryptor crypt.Encryptor) (int, error) {
 	data, err := json.Marshal(&l)
 	if err != nil {
 		return 0, err
 	}
 
-	return postRequest(context.TODO(), url, data, encryptor, map[string]string{
+	return postRequest(ctx, url, data, encryptor, map[string]string{
 		"Content-Type":     "application/json; charset=UTF-8",
 		"Content-Encoding": "gzip",
 		"Accept-Encoding":  "gzip",

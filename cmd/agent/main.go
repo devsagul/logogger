@@ -171,6 +171,6 @@ func report(poller *reporter.Reporter, l []schema.Metrics, host string, key stri
 		l = signed
 	}
 
-	err := poller.ReportMetricsBatches(l, host)
+	err := poller.ReportMetricsBatches(context.Background(), l, host)
 	return err
 }
