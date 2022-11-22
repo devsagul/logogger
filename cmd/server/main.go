@@ -5,10 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/caarlos0/env/v6"
@@ -161,8 +164,22 @@ func main() {
 	log.Println("Initializing application...")
 	app := server.NewApp(store).WithDumper(d).WithDumpInterval(cfg.StoreInterval).WithKey(cfg.Key).WithDecryptor(decryptor)
 	log.Println("Listening...")
-	err = http.ListenAndServe(cfg.Address, app.Router)
+	server := http.Server{Addr: cfg.Address, Handler: app.Router}
+	idleConnsClosed := make(chan struct{})
+	sigint := make(chan os.Signal, 1)
+	signal.Notify(sigint, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	go func() {
+		<-sigint
+		if err := server.Shutdown(context.Background()); err != nil {
+			log.Printf("HTTP server Shutdown: %v", err)
+		}
+		close(idleConnsClosed)
+	}()
+
+	err = server.ListenAndServe()
 	if err != nil {
 		log.Fatal("Error Starting the HTTP Server : ", err)
 	}
+	<-idleConnsClosed
+	fmt.Println("Server Shutdown gracefully")
 }
