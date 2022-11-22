@@ -123,10 +123,12 @@ func main() {
 		}
 	}), time.Minute)()
 
+	reporter := reporter.NewPoller(encryptor)
+
 	go utils.RetryForever(utils.WrapGoroutinePanic(func() error {
 		for {
 			<-reportTicker.C
-			err := report(metrics, reportHost, cfg.Key, encryptor)
+			err := report(reporter, metrics, reportHost, cfg.Key)
 			if err == nil {
 				err = p.Reset(ctx)
 				if err != nil {
@@ -143,9 +145,12 @@ func main() {
 
 	<-sigs
 	log.Println("Exiting agent gracefully...")
+	pollTicker.Stop()
+	reportTicker.Stop()
+	reporter.Shutdown()
 }
 
-func report(l []schema.Metrics, host string, key string, encryptor crypt.Encryptor) error {
+func report(poller *reporter.Poller, l []schema.Metrics, host string, key string) error {
 	if key != "" {
 		eg := errgroup.Group{}
 		var signed []schema.Metrics
@@ -166,6 +171,6 @@ func report(l []schema.Metrics, host string, key string, encryptor crypt.Encrypt
 		l = signed
 	}
 
-	err := reporter.ReportMetricsBatches(l, host, encryptor)
+	err := poller.ReportMetricsBatches(l, host)
 	return err
 }

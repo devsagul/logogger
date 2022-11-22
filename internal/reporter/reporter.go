@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,7 +25,57 @@ type ServerResponse struct {
 	dur  time.Duration
 }
 
-var batches = true
+type Poller struct {
+	batches   bool
+	wg        sync.WaitGroup
+	encryptor crypt.Encryptor
+}
+
+func (poller *Poller) ReportMetrics(l []schema.Metrics, host string) error {
+	poller.wg.Add(1)
+	defer poller.wg.Done()
+
+	eg := &errgroup.Group{}
+
+	for _, m := range l {
+		m := m
+		url := fmt.Sprintf("%s/update/", host)
+		eg.Go(utils.WrapGoroutinePanic(func() error {
+			return postRequest(url, m, poller.encryptor)
+		}))
+	}
+
+	return eg.Wait()
+}
+
+func (poller *Poller) ReportMetricsBatches(l []schema.Metrics, host string) error {
+	poller.wg.Add(1)
+	defer poller.wg.Done()
+
+	if poller.batches {
+		if len(l) == 0 {
+			return nil
+		}
+		url := fmt.Sprintf("%s/updates/", host)
+		code, err := postBatchRequest(url, l, poller.encryptor)
+		if code == http.StatusNotFound {
+			// if the server can't handle /updates URL, we should
+			// use standard handle
+			poller.batches = false
+		} else {
+			return err
+		}
+	}
+	return poller.ReportMetrics(l, host)
+}
+
+func (poller *Poller) Shutdown() {
+	poller.wg.Wait()
+}
+
+func NewPoller(encryptor crypt.Encryptor) *Poller {
+	return &Poller{batches: true, encryptor: encryptor, wg: sync.WaitGroup{}}
+}
 
 func postRequest(url string, m schema.Metrics, encryptor crypt.Encryptor) error {
 	id, err := uuid.NewRandom()
@@ -108,36 +159,4 @@ func postBatchRequest(url string, l []schema.Metrics, encryptor crypt.Encryptor)
 		}
 	}
 	return code, nil
-}
-
-func ReportMetrics(l []schema.Metrics, host string, encryptor crypt.Encryptor) error {
-	eg := &errgroup.Group{}
-
-	for _, m := range l {
-		m := m
-		url := fmt.Sprintf("%s/update/", host)
-		eg.Go(utils.WrapGoroutinePanic(func() error {
-			return postRequest(url, m, encryptor)
-		}))
-	}
-
-	return eg.Wait()
-}
-
-func ReportMetricsBatches(l []schema.Metrics, host string, encryptor crypt.Encryptor) error {
-	if batches {
-		if len(l) == 0 {
-			return nil
-		}
-		url := fmt.Sprintf("%s/updates/", host)
-		code, err := postBatchRequest(url, l, encryptor)
-		if code == http.StatusNotFound {
-			// if the server can't handle /updates URL, we should
-			// use standard handle
-			batches = false
-		} else {
-			return err
-		}
-	}
-	return ReportMetrics(l, host, encryptor)
 }

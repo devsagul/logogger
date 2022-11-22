@@ -75,7 +75,8 @@ func TestReportMetrics(t *testing.T) {
 	defer server.Close()
 	encryptor, err := crypt.NewEncryptor("")
 	assert.NoError(t, err)
-	err = ReportMetrics(l, server.URL, encryptor)
+	poller := NewPoller(encryptor)
+	err = poller.ReportMetrics(l, server.URL)
 
 	if err != nil {
 		assert.FailNow(t, "Error reporting data.")
@@ -105,10 +106,11 @@ func TestReportMetrics_FaultyServer(t *testing.T) {
 	server := httptest.NewServer(handler)
 	encryptor, err := crypt.NewEncryptor("")
 	assert.NoError(t, err)
+	poller := NewPoller(encryptor)
 
-	err1 := ReportMetrics(l, server.URL, encryptor)
+	err1 := poller.ReportMetrics(l, server.URL)
 	server.Close()
-	err2 := ReportMetrics(l, server.URL, encryptor)
+	err2 := poller.ReportMetrics(l, server.URL)
 
 	assert.NotNil(t, err1)
 	assert.NotNil(t, err2)
