@@ -107,9 +107,6 @@ func (p PostgresStorage) List(ctx context.Context) ([]schema.Metrics, error) {
 	}
 	defer rollback()
 
-	if err != nil {
-		return res, err
-	}
 	query, err := tx.PrepareContext(ctx, "SELECT id, type, delta, value FROM metric")
 	if err != nil {
 		return res, err
