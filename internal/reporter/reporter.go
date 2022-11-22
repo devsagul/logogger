@@ -3,6 +3,7 @@ package reporter
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -41,7 +42,7 @@ func (poller *Poller) ReportMetrics(l []schema.Metrics, host string) error {
 		m := m
 		url := fmt.Sprintf("%s/update/", host)
 		eg.Go(utils.WrapGoroutinePanic(func() error {
-			return postRequest(url, m, poller.encryptor)
+			return postSingleRequest(url, m, poller.encryptor)
 		}))
 	}
 
@@ -52,20 +53,21 @@ func (poller *Poller) ReportMetricsBatches(l []schema.Metrics, host string) erro
 	poller.wg.Add(1)
 	defer poller.wg.Done()
 
-	if poller.batches {
-		if len(l) == 0 {
-			return nil
-		}
-		url := fmt.Sprintf("%s/updates/", host)
-		code, err := postBatchRequest(url, l, poller.encryptor)
-		if code == http.StatusNotFound {
-			// if the server can't handle /updates URL, we should
-			// use standard handle
-			poller.batches = false
-		} else {
-			return err
-		}
+	if !poller.batches {
+		return poller.ReportMetrics(l, host)
 	}
+
+	if len(l) == 0 {
+		return nil
+	}
+	url := fmt.Sprintf("%s/updates/", host)
+	code, err := postBatchRequest(url, l, poller.encryptor)
+
+	// if batches url is unavailable, we should use ordinary API
+	if code != http.StatusNotFound {
+		return err
+	}
+	poller.batches = false
 	return poller.ReportMetrics(l, host)
 }
 
@@ -77,79 +79,63 @@ func NewPoller(encryptor crypt.Encryptor) *Poller {
 	return &Poller{batches: true, encryptor: encryptor, wg: sync.WaitGroup{}}
 }
 
-func postRequest(url string, m schema.Metrics, encryptor crypt.Encryptor) error {
-	id, err := uuid.NewRandom()
-	if err != nil {
-		return err
-	}
-	log.Printf("%s, Sending %s to %s", id, m.ID, url)
-	start := time.Now()
-	b, err := json.Marshal(&m)
+func postSingleRequest(url string, m schema.Metrics, encryptor crypt.Encryptor) error {
+	data, err := json.Marshal(&m)
 	if err != nil {
 		return err
 	}
 
-	b, err = encryptor.Encrypt(b)
-	if err != nil {
-		return err
-	}
-
-	request, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
-	if err != nil {
-		return err
-	}
-	request.Header.Set("Content-Type", "application/json; charset=UTF-8")
-
-	client := &http.Client{}
-	dur := time.Since(start)
-	resp, err := client.Do(request)
-	if err != nil {
-		log.Printf("%s Got error after %dms: %s", id, dur.Milliseconds(), err.Error())
-		return err
-	}
-	err = resp.Body.Close()
-	log.Printf("Got response after %dms", dur.Milliseconds())
-	if err == nil {
-		code := resp.StatusCode
-		if code != http.StatusOK {
-			return fmt.Errorf("%s server returned %d code", id, code)
-		}
-	}
+	_, err = postRequest(context.TODO(), url, data, encryptor, map[string]string{
+		"Content-Type": "application/json; charset=UTF-8",
+	})
 	return err
 }
 
 func postBatchRequest(url string, l []schema.Metrics, encryptor crypt.Encryptor) (int, error) {
+	data, err := json.Marshal(&l)
+	if err != nil {
+		return 0, err
+	}
+
+	return postRequest(context.TODO(), url, data, encryptor, map[string]string{
+		"Content-Type":     "application/json; charset=UTF-8",
+		"Content-Encoding": "gzip",
+		"Accept-Encoding":  "gzip",
+	})
+}
+
+func postRequest(ctx context.Context, url string, data []byte, encryptor crypt.Encryptor, headers map[string]string) (int, error) {
 	id, err := uuid.NewRandom()
 	if err != nil {
 		return 0, err
 	}
-	log.Printf("%s, Sending batch update to %s", id, url)
-	start := time.Now()
-	b, err := json.Marshal(&l)
+	log.Printf("%s, Sending post request to %s", id, url)
+
+	body, err := encryptor.Encrypt(data)
 	if err != nil {
 		return 0, err
 	}
 
-	b, err = encryptor.Encrypt(b)
+	request, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	if err != nil {
 		return 0, err
 	}
 
-	request, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
-	if err != nil {
-		return 0, err
+	for key, value := range headers {
+		request.Header.Set(key, value)
 	}
-	request.Header.Set("Content-Type", "application/json; charset=UTF-8")
-	request.Header.Set("Content-Encoding", "gzip")
-	request.Header.Set("Accept-Encoding", "gzip")
 
 	client := &http.Client{}
-	dur := time.Since(start)
+
+	start := time.Now()
 	resp, err := client.Do(request)
+	dur := time.Since(start)
+
 	if err != nil {
 		log.Printf("%s Got error after %dms: %s", id, dur.Milliseconds(), err.Error())
 		return 0, err
 	}
+
 	err = resp.Body.Close()
 	log.Printf("Got response after %dms", dur.Milliseconds())
 	code := resp.StatusCode
