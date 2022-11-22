@@ -179,6 +179,8 @@ func (app *App) updateValueJSON(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
+	print(data)
+
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 
@@ -434,6 +436,7 @@ func NewApp(
 	r.With(middleware.SetHeader("Content-Type", "application/json")).Post("/value/", app.newHandler(app.retrieveValueJSON))
 	r.With(middleware.SetHeader("Content-Type", "text/plain")).Get("/ping", app.newHandler(app.ping))
 	r.With(middleware.SetHeader("Content-Type", "text/html")).Get("/", app.newHandler(app.listMetrics))
+
 	return app
 }
 
