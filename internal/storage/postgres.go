@@ -17,35 +17,26 @@ type PostgresStorage struct {
 }
 
 func (p PostgresStorage) Put(ctx context.Context, req schema.Metrics) error {
+	var value interface{}
+	var query string
+
 	switch req.MType {
 	case schema.MetricsTypeCounter:
-		log.Println("prepare query")
-		putQuery, err := p.db.PrepareContext(ctx, "INSERT INTO metric(id, type, delta, value) VALUES($1, 'counter', $2, NULL) ON CONFLICT (id) DO UPDATE SET type='counter', delta=EXCLUDED.delta, value=NULL")
-		if err != nil {
-			return err
-		}
-		log.Println("exec query")
-		_, err = putQuery.ExecContext(ctx, req.ID, *req.Delta)
-		if err != nil {
-			return err
-		}
+		query = "INSERT INTO metric(id, type, delta, value) VALUES($1, 'counter', $2, NULL) ON CONFLICT (id) DO UPDATE SET type='counter', delta=EXCLUDED.delta, value=NULL"
+		value = *req.Delta
 	case schema.MetricsTypeGauge:
-		log.Println("prepare query")
-		putQuery, err := p.db.PrepareContext(ctx, "INSERT INTO metric(id, type, delta, value) VALUES($1, 'gauge', NULL, $2) ON CONFLICT (id) DO UPDATE SET type='gauge', delta=NULL, value=EXCLUDED.value")
-		if err != nil {
-			log.Printf("PREPARE ERROR: %v", err)
-			return err
-		}
-		log.Println("exec query")
-		_, err = putQuery.ExecContext(ctx, req.ID, *req.Value)
-		if err != nil {
-			log.Printf("EXEC ERROR: %v", err)
-			return err
-		}
+		query = "INSERT INTO metric(id, type, delta, value) VALUES($1, 'gauge', NULL, $2) ON CONFLICT (id) DO UPDATE SET type='gauge', delta=NULL, value=EXCLUDED.value"
+		value = *req.Value
 	default:
 		return fmt.Errorf("unsupported metrics type: %s", req.MType)
 	}
-	return nil
+
+	putQuery, err := p.db.PrepareContext(ctx, query)
+	if err != nil {
+		return err
+	}
+	_, err = putQuery.ExecContext(ctx, req.ID, value)
+	return err
 }
 
 func (p PostgresStorage) Extract(ctx context.Context, req schema.Metrics) (schema.Metrics, error) {
@@ -71,13 +62,9 @@ func (p PostgresStorage) Extract(ctx context.Context, req schema.Metrics) (schem
 	}
 	if delta.Valid {
 		res.Delta = &delta.Int64
-	} else {
-		res.Delta = nil
 	}
 	if value.Valid {
 		res.Value = &value.Float64
-	} else {
-		res.Value = nil
 	}
 	return res, nil
 }
@@ -87,16 +74,11 @@ func (p PostgresStorage) Increment(ctx context.Context, req schema.Metrics, valu
 		return incrementingNonCounterMetrics(req.ID, req.MType)
 	}
 
-	tx, err := p.db.BeginTx(ctx, nil)
+	tx, rollback, err := p.Transaction(ctx)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		err = tx.Rollback()
-		if err != nil {
-			log.Printf("Error occured on Rollback: %s", err.Error())
-		}
-	}()
+	defer rollback()
 
 	_, err = p.Extract(ctx, req)
 	if err != nil {
@@ -119,13 +101,11 @@ func (p PostgresStorage) Increment(ctx context.Context, req schema.Metrics, valu
 func (p PostgresStorage) List(ctx context.Context) ([]schema.Metrics, error) {
 	var res []schema.Metrics
 
-	tx, err := p.db.BeginTx(ctx, nil)
-	defer func() {
-		err = tx.Rollback()
-		if err != nil {
-			log.Printf("Error occured on Rollback: %s", err.Error())
-		}
-	}()
+	tx, rollback, err := p.Transaction(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollback()
 
 	if err != nil {
 		return res, err
@@ -159,16 +139,12 @@ func (p PostgresStorage) List(ctx context.Context) ([]schema.Metrics, error) {
 }
 
 func (p PostgresStorage) BulkPut(ctx context.Context, values []schema.Metrics) error {
-	tx, err := p.db.BeginTx(ctx, nil)
+	tx, rollback, err := p.Transaction(ctx)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		err = tx.Rollback()
-		if err != nil {
-			log.Printf("Error occured on Rollback: %s", err.Error())
-		}
-	}()
+	defer rollback()
+
 	putQuery, err := p.db.PrepareContext(ctx, "INSERT INTO metric(id, type, delta, value) VALUES($1, $2, $3, $4)")
 	if err != nil {
 		return err
@@ -177,34 +153,25 @@ func (p PostgresStorage) BulkPut(ctx context.Context, values []schema.Metrics) e
 		switch metric.MType {
 		case schema.MetricsTypeCounter:
 			_, err = putQuery.ExecContext(ctx, metric.ID, metric.MType, *metric.Delta, nil)
-			if err != nil {
-				return err
-			}
 		case schema.MetricsTypeGauge:
 			_, err = putQuery.ExecContext(ctx, metric.ID, metric.MType, nil, *metric.Value)
-			if err != nil {
-				return err
-			}
 		default:
 			return fmt.Errorf("unsupported metrics type: %s", metric.MType)
 		}
+		if err != nil {
+			return err
+		}
 	}
 
-	err = tx.Commit()
-	return err
+	return tx.Commit()
 }
 
 func (p PostgresStorage) BulkUpdate(ctx context.Context, counters []schema.Metrics, gauges []schema.Metrics) error {
-	tx, err := p.db.BeginTx(ctx, nil)
+	tx, rollback, err := p.Transaction(ctx)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		err = tx.Rollback()
-		if err != nil {
-			log.Printf("Error occured on Rollback: %s", err.Error())
-		}
-	}()
+	defer rollback()
 
 	putQuery, err := p.db.PrepareContext(ctx, "INSERT INTO metric(id, type, delta, value) VALUES($1, 'counter', $2, NULL) ON CONFLICT (id) DO UPDATE SET type='counter', delta=metric.delta+EXCLUDED.delta, value=NULL")
 	if err != nil {
@@ -238,17 +205,29 @@ func (p PostgresStorage) Close() error {
 	return p.db.Close()
 }
 
+func (p PostgresStorage) Transaction(ctx context.Context) (*sql.Tx, func(), error) {
+	tx, err := p.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	rollback := func() {
+		err = tx.Rollback()
+		if err != nil {
+			log.Printf("Error occured on Rollback: %s", err.Error())
+		}
+	}
+
+	return tx, rollback, nil
+}
+
 func NewPostgresStorage(dsn string) (PostgresStorage, error) {
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		return PostgresStorage{}, err
 	}
+	p := PostgresStorage{db}
 
 	_, err = db.Exec("CREATE TABLE IF NOT EXISTS metric (id VARCHAR(255) PRIMARY KEY, type VARCHAR(255) NOT NULL, delta BIGINT, value DOUBLE PRECISION)")
-	if err != nil {
-		return PostgresStorage{}, err
-	}
-
-	p := PostgresStorage{db}
-	return p, nil
+	return p, err
 }

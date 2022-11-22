@@ -268,3 +268,29 @@ func TestMemStorage_ListTrivial(t *testing.T) {
 
 	assert.Equal(t, expected, actual)
 }
+
+func TestMemStorage_BulkPutAndUpdate(t *testing.T) {
+	storage := NewMemStorage()
+	counter := schema.NewCounter("counter", 42)
+	gauge := schema.NewGauge("gauge", 13.37)
+	expected := []schema.Metrics{counter, gauge}
+
+	err := storage.BulkPut(context.Background(), []schema.Metrics{counter, gauge})
+	assert.NoError(t, err)
+	actual, err := storage.List(context.Background())
+	assert.NoError(t, err)
+
+	assert.Equal(t, expected, actual)
+
+	gauge = schema.NewGauge("gauge", 17.19)
+	counter = schema.NewCounter("counter", 13)
+	err = storage.BulkUpdate(context.Background(), []schema.Metrics{counter}, []schema.Metrics{gauge})
+	assert.NoError(t, err)
+	actual, err = storage.List(context.Background())
+	assert.NoError(t, err)
+
+	counter = schema.NewCounter("counter", 55)
+	expected = []schema.Metrics{counter, gauge}
+
+	assert.Equal(t, expected, actual)
+}
