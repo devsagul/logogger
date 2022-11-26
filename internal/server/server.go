@@ -15,25 +15,47 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"logogger/internal/crypt"
 	"logogger/internal/dumper"
 	"logogger/internal/schema"
 	"logogger/internal/storage"
 )
 
 type App struct {
-	store  storage.MetricsStorage
-	dumper dumper.Dumper
-	Router *chi.Mux
-	key    string
-	sync   bool
+	store     storage.MetricsStorage
+	decryptor crypt.Decryptor
+	dumper    dumper.Dumper
+	Router    *chi.Mux
+	key       string
+	sync      bool
 }
 
 type errorHTTPHandler func(http.ResponseWriter, *http.Request) error
 
-func newHandler(handler errorHTTPHandler) http.HandlerFunc {
+func (app *App) newHandler(handler errorHTTPHandler) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		errChan := make(chan error)
 		ctx := request.Context()
+
+		if request.Body != nil {
+			data, err := io.ReadAll(request.Body)
+			if err != nil {
+				log.Printf("ERROR: %+v", err)
+				writer.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			if data != nil {
+				data, err = app.decryptor.Decrypt(data)
+				if err != nil {
+					log.Printf("ERROR: %+v", err)
+					writer.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+
+				request.Body = io.NopCloser(bytes.NewReader(data))
+				request.ContentLength = int64(len(data))
+			}
+		}
 
 		go func() {
 			defer func() {
@@ -155,6 +177,8 @@ func (app *App) updateValueJSON(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+
+	print(data)
 
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
@@ -394,6 +418,7 @@ func NewApp(
 	app.store = store
 	app.dumper = dumper.NoOpDumper{}
 	app.sync = false
+	app.decryptor = crypt.NoOpDecryptor{}
 	app.key = ""
 
 	// useful middlewares
@@ -403,13 +428,14 @@ func NewApp(
 	r.Use(middleware.Timeout(60 * time.Second))
 	r.Use(middleware.Compress(5))
 
-	r.With(middleware.SetHeader("Content-Type", "text/plain")).Post("/update/{Type}/{Name}/{Value}", newHandler(app.updateValue))
-	r.With(middleware.SetHeader("Content-Type", "text/plain")).Get("/value/{Type}/{Name}", newHandler(app.retrieveValue))
-	r.With(middleware.SetHeader("Content-Type", "application/json")).Post("/update/", newHandler(app.updateValueJSON))
-	r.With(middleware.SetHeader("Content-Type", "application/json")).Post("/updates/", newHandler(app.updateValuesJSON))
-	r.With(middleware.SetHeader("Content-Type", "application/json")).Post("/value/", newHandler(app.retrieveValueJSON))
-	r.With(middleware.SetHeader("Content-Type", "text/plain")).Get("/ping", newHandler(app.ping))
-	r.With(middleware.SetHeader("Content-Type", "text/html")).Get("/", newHandler(app.listMetrics))
+	r.With(middleware.SetHeader("Content-Type", "text/plain")).Post("/update/{Type}/{Name}/{Value}", app.newHandler(app.updateValue))
+	r.With(middleware.SetHeader("Content-Type", "text/plain")).Get("/value/{Type}/{Name}", app.newHandler(app.retrieveValue))
+	r.With(middleware.SetHeader("Content-Type", "application/json")).Post("/update/", app.newHandler(app.updateValueJSON))
+	r.With(middleware.SetHeader("Content-Type", "application/json")).Post("/updates/", app.newHandler(app.updateValuesJSON))
+	r.With(middleware.SetHeader("Content-Type", "application/json")).Post("/value/", app.newHandler(app.retrieveValueJSON))
+	r.With(middleware.SetHeader("Content-Type", "text/plain")).Get("/ping", app.newHandler(app.ping))
+	r.With(middleware.SetHeader("Content-Type", "text/html")).Get("/", app.newHandler(app.listMetrics))
+
 	return app
 }
 
@@ -438,5 +464,10 @@ func (app *App) WithDumpInterval(interval time.Duration) *App {
 
 func (app *App) WithKey(key string) *App {
 	app.key = key
+	return app
+}
+
+func (app *App) WithDecryptor(decryptor crypt.Decryptor) *App {
+	app.decryptor = decryptor
 	return app
 }

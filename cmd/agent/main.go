@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -14,6 +15,7 @@ import (
 	"github.com/caarlos0/env/v6"
 	"golang.org/x/sync/errgroup"
 
+	"logogger/internal/crypt"
 	"logogger/internal/poller"
 	"logogger/internal/reporter"
 	"logogger/internal/schema"
@@ -27,10 +29,14 @@ var (
 )
 
 type config struct {
-	ReportHost     string        `env:"ADDRESS"`
-	Key            string        `env:"KEY"`
-	PollInterval   time.Duration `env:"POLL_INTERVAL"`
-	ReportInterval time.Duration `env:"REPORT_INTERVAL"`
+	RawPollInterval   string        `json:"poll_interval"`
+	RawReportInterval string        `json:"report_interval"`
+	ConfigFilePath    string        `enc:"CONFIG"`
+	CryptoKey         string        `env:"CRYPTO_KEY" json:"crypto_key"`
+	ReportHost        string        `env:"ADDRESS" json:"report_host"`
+	Key               string        `env:"KEY" json:"key"`
+	PollInterval      time.Duration `env:"POLL_INTERVAL"`
+	ReportInterval    time.Duration `env:"REPORT_INTERVAL"`
 }
 
 var cfg config
@@ -38,6 +44,7 @@ var cfg config
 func init() {
 	flag.DurationVar(&cfg.PollInterval, "p", 2*time.Second, "Interval of metrics polling")
 	flag.DurationVar(&cfg.ReportInterval, "r", 10*time.Second, "Interval of metrics reporting")
+	flag.StringVar(&cfg.CryptoKey, "crypto-key", "", "Path to file with public encryption key")
 	flag.StringVar(&cfg.ReportHost, "a", "localhost:8080", "Address of the server to report metrics to")
 	flag.StringVar(&cfg.Key, "k", "", "Secret key to sign metrics (should be shared between server and agent)")
 }
@@ -48,6 +55,39 @@ func main() {
 	err := env.Parse(&cfg)
 	if err != nil {
 		log.Println("Could not parse config")
+		os.Exit(1)
+	}
+
+	if len(cfg.ConfigFilePath) > 0 {
+		data, err := os.ReadFile(cfg.ConfigFilePath)
+		if err != nil {
+			log.Fatal("Could not read config file : ", err)
+		}
+		err = json.Unmarshal(data, &cfg)
+		if err != nil {
+			log.Fatal("Could not parse config file : ", err)
+		}
+		cfg.PollInterval, err = time.ParseDuration(cfg.RawPollInterval)
+		if err != nil {
+			log.Fatal("Could not parse config file : ", err)
+		}
+		cfg.ReportInterval, err = time.ParseDuration(cfg.RawReportInterval)
+		if err != nil {
+			log.Fatal("Could not parse config file : ", err)
+		}
+	}
+
+	// preserve order
+	flag.Parse()
+	err = env.Parse(&cfg)
+	if err != nil {
+		log.Println("Could not parse config")
+		os.Exit(1)
+	}
+
+	encryptor, err := crypt.NewEncryptor(cfg.CryptoKey)
+	if err != nil {
+		log.Println("Could not setup encryption")
 		os.Exit(1)
 	}
 
@@ -83,10 +123,12 @@ func main() {
 		}
 	}), time.Minute)()
 
+	reporter := reporter.NewReporter(encryptor)
+
 	go utils.RetryForever(utils.WrapGoroutinePanic(func() error {
 		for {
 			<-reportTicker.C
-			err := report(metrics, reportHost, cfg.Key)
+			err := report(reporter, metrics, reportHost, cfg.Key)
 			if err == nil {
 				err = p.Reset(ctx)
 				if err != nil {
@@ -103,9 +145,12 @@ func main() {
 
 	<-sigs
 	log.Println("Exiting agent gracefully...")
+	pollTicker.Stop()
+	reportTicker.Stop()
+	reporter.Shutdown()
 }
 
-func report(l []schema.Metrics, host string, key string) error {
+func report(poller *reporter.Reporter, l []schema.Metrics, host string, key string) error {
 	if key != "" {
 		eg := errgroup.Group{}
 		var signed []schema.Metrics
@@ -126,6 +171,6 @@ func report(l []schema.Metrics, host string, key string) error {
 		l = signed
 	}
 
-	err := reporter.ReportMetricsBatches(l, host)
+	err := poller.ReportMetricsBatches(context.Background(), l, host)
 	return err
 }

@@ -5,14 +5,18 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/caarlos0/env/v6"
 
+	"logogger/internal/crypt"
 	"logogger/internal/dumper"
 	"logogger/internal/schema"
 	"logogger/internal/server"
@@ -27,31 +31,57 @@ var (
 )
 
 type config struct {
-	Address       string        `env:"ADDRESS"`
-	StoreFile     string        `env:"STORE_FILE"`
-	Key           string        `env:"KEY"`
-	DatabaseDSN   string        `env:"DATABASE_DSN"`
-	StoreInterval time.Duration `env:"STORE_INTERVAL"`
-	Restore       bool          `env:"RESTORE"`
+	RawStoreInterval string        `json:"store_interval"`
+	Address          string        `env:"ADDRESS" json:"address"`
+	ConfigFilePath   string        `enc:"CONFIG"`
+	CryptoKey        string        `env:"CRYPTO_KEY" json:"crypto_key"`
+	StoreFile        string        `env:"STORE_FILE" json:"store_file"`
+	Key              string        `env:"KEY" json:"key"`
+	DatabaseDSN      string        `env:"DATABASE_DSN" json:"database_dsn"`
+	StoreInterval    time.Duration `env:"STORE_INTERVAL"`
+	Restore          bool          `env:"RESTORE" json:"restore"`
 }
 
 var cfg config
 
 func init() {
 	flag.StringVar(&cfg.Address, "a", "localhost:8080", "Address of the server (to listen to)")
+	flag.StringVar(&cfg.CryptoKey, "crypto-key", "", "Path to file with private encryption key")
 	flag.DurationVar(&cfg.StoreInterval, "i", 300*time.Second, "Interval for storage state to be dumped on disk")
 	flag.StringVar(&cfg.StoreFile, "f", "/tmp/devops-metrics-db.json", "Path to the file for dumping storage state")
 	flag.BoolVar(&cfg.Restore, "r", true, "Restore store state from dump file on server initialization")
 	flag.StringVar(&cfg.Key, "k", "", "Secret key to sign metrics (should be shared between server and agent)")
 	flag.StringVar(&cfg.DatabaseDSN, "d", "", "Database connection string")
+	flag.StringVar(&cfg.ConfigFilePath, "c", "", "Path to JSON configuration")
 }
 
 func main() {
 	utils.PrintVersionInfo(buildVersion, buildDate, buildCommit)
 	log.Println("Initializing server...")
-	log.Printf("%v", os.Args)
 	flag.Parse()
 	err := env.Parse(&cfg)
+	if err != nil {
+		log.Fatal("Could not parse config : ", err)
+	}
+
+	if len(cfg.ConfigFilePath) > 0 {
+		data, err := os.ReadFile(cfg.ConfigFilePath)
+		if err != nil {
+			log.Fatal("Could not read config file : ", err)
+		}
+		err = json.Unmarshal(data, &cfg)
+		if err != nil {
+			log.Fatal("Could not parse config file : ", err)
+		}
+		cfg.StoreInterval, err = time.ParseDuration(cfg.RawStoreInterval)
+		if err != nil {
+			log.Fatal("Could not parse config file : ", err)
+		}
+	}
+
+	// do it again to preserve order
+	flag.Parse()
+	err = env.Parse(&cfg)
 	if err != nil {
 		log.Fatal("Could not parse config : ", err)
 	}
@@ -59,6 +89,12 @@ func main() {
 		log.Fatal("Invalid value for store interval")
 	}
 	log.Printf("DSN: %v", cfg.DatabaseDSN)
+
+	decryptor, err := crypt.NewDecryptor(cfg.CryptoKey)
+	if err != nil {
+		log.Println("Could not setup encryption")
+		os.Exit(1)
+	}
 
 	var store storage.MetricsStorage
 	if cfg.DatabaseDSN != "" {
@@ -126,10 +162,24 @@ func main() {
 	}()
 
 	log.Println("Initializing application...")
-	app := server.NewApp(store).WithDumper(d).WithDumpInterval(cfg.StoreInterval).WithKey(cfg.Key)
+	app := server.NewApp(store).WithDumper(d).WithDumpInterval(cfg.StoreInterval).WithKey(cfg.Key).WithDecryptor(decryptor)
 	log.Println("Listening...")
-	err = http.ListenAndServe(cfg.Address, app.Router)
+	server := http.Server{Addr: cfg.Address, Handler: app.Router}
+	idleConnsClosed := make(chan struct{})
+	sigint := make(chan os.Signal, 1)
+	signal.Notify(sigint, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	go func() {
+		<-sigint
+		if err := server.Shutdown(context.Background()); err != nil {
+			log.Printf("HTTP server Shutdown: %v", err)
+		}
+		close(idleConnsClosed)
+	}()
+
+	err = server.ListenAndServe()
 	if err != nil {
 		log.Fatal("Error Starting the HTTP Server : ", err)
 	}
+	<-idleConnsClosed
+	fmt.Println("Server Shutdown gracefully")
 }

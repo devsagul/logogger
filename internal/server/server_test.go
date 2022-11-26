@@ -378,6 +378,63 @@ func TestApp_RetrieveValueJSONWrongType(t *testing.T) {
 	assert.Contains(t, respBody, "Could not perform requested operation")
 }
 
+func TestApp_UpdateValueJSON(t *testing.T) {
+	store := storage.NewMemStorage()
+	app := NewApp(store)
+
+	m := schema.NewCounter("ctrID", 42)
+	_, err := json.Marshal(m)
+	assert.NoError(t, err)
+	err = store.Put(context.Background(), m)
+	assert.NoError(t, err)
+
+	params := [...]struct {
+		request []schema.Metrics
+		needle  string
+		code    int
+	}{
+		{[]schema.Metrics{schema.NewCounterRequest("nonExistent")}, "{\"id\":\"ctrID\",\"type\":\"counter\",\"delta\":42}", http.StatusOK},
+	}
+
+	for _, param := range params {
+		serialized, err := json.Marshal(param.request)
+		assert.NoError(t, err)
+		body := bytes.NewBuffer(serialized)
+		req, err := http.NewRequest(http.MethodPost, "/updates/", body)
+		assert.NoError(t, err)
+		recorder := httptest.NewRecorder()
+		app.Router.ServeHTTP(recorder, req)
+
+		responseCode := recorder.Code
+		respBody := recorder.Body.String()
+
+		assert.Equal(t, param.code, responseCode)
+		assert.Contains(t, respBody, param.needle)
+	}
+}
+
+func TestApp_UpdateValueJSONWrongType(t *testing.T) {
+	store := storage.NewMemStorage()
+	app := NewApp(store)
+	m := schema.Metrics{
+		ID: "id", MType: "statistics",
+	}
+
+	serialized, err := json.Marshal(m)
+	assert.NoError(t, err)
+	body := bytes.NewBuffer(serialized)
+	req, err := http.NewRequest(http.MethodPost, "/value/", body)
+	assert.NoError(t, err)
+	recorder := httptest.NewRecorder()
+	app.Router.ServeHTTP(recorder, req)
+
+	responseCode := recorder.Code
+	respBody := recorder.Body.String()
+
+	assert.Equal(t, http.StatusNotImplemented, responseCode)
+	assert.Contains(t, respBody, "Could not perform requested operation")
+}
+
 func TestApp_FaultyStorage(t *testing.T) {
 	store := faultyStorage{}
 	app := NewApp(store)
