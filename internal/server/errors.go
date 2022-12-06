@@ -30,9 +30,6 @@ func ValidationError(messages ...string) *validationError {
 }
 
 func convertError(e error) *applicationError {
-	if e == nil {
-		return nil
-	}
 	switch err := e.(type) {
 	case nil:
 		return nil
