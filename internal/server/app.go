@@ -4,17 +4,18 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
+
 	"logogger/internal/dumper"
 	"logogger/internal/schema"
 	"logogger/internal/storage"
-	"time"
 )
 
 type App struct {
-	store  storage.MetricsStorage
-	sync   bool
 	dumper dumper.Dumper
+	store  storage.MetricsStorage
 	key    string
+	sync   bool
 }
 
 func NewApp(
@@ -108,6 +109,10 @@ func (app *App) updateValue(
 				"Unable to perform requested action on metrics type %s", req.MType,
 			),
 		))
+	}
+
+	if err != nil {
+		return schema.NewEmptyMetrics(), convertError(err)
 	}
 
 	if app.sync {

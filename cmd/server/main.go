@@ -39,9 +39,9 @@ type config struct {
 	Key              string        `env:"KEY" json:"key"`
 	DatabaseDSN      string        `env:"DATABASE_DSN" json:"database_dsn"`
 	TrustedSubnet    string        `env:"TRUSTED_SUBNET" json:"trusted_subnet"`
+	Protocol         string        `env:"PROTOCOL" json:"protocol"`
 	StoreInterval    time.Duration `env:"STORE_INTERVAL"`
 	Restore          bool          `env:"RESTORE" json:"restore"`
-	Protocol         string        `env:"PROTOCOL" json:"protocol"`
 }
 
 var cfg config
@@ -69,17 +69,17 @@ func main() {
 	}
 
 	if len(cfg.ConfigFilePath) > 0 {
-		data, err := os.ReadFile(cfg.ConfigFilePath)
-		if err != nil {
-			log.Fatal("Could not read config file : ", err)
+		data, e := os.ReadFile(cfg.ConfigFilePath)
+		if e != nil {
+			log.Fatal("Could not read config file : ", e)
 		}
-		err = json.Unmarshal(data, &cfg)
-		if err != nil {
-			log.Fatal("Could not parse config file : ", err)
+		e = json.Unmarshal(data, &cfg)
+		if e != nil {
+			log.Fatal("Could not parse config file : ", e)
 		}
-		cfg.StoreInterval, err = time.ParseDuration(cfg.RawStoreInterval)
-		if err != nil {
-			log.Fatal("Could not parse config file : ", err)
+		cfg.StoreInterval, e = time.ParseDuration(cfg.RawStoreInterval)
+		if e != nil {
+			log.Fatal("Could not parse config file : ", e)
 		}
 	}
 
@@ -177,9 +177,9 @@ func main() {
 	var srv server.Server
 
 	if cfg.Protocol == "grpc" {
-		srv = server.NewGrpcServer(app)
+		srv = server.NewGRPCServer(app)
 	} else {
-		srv = server.NewHttpServer(app)
+		srv = server.NewHTTPServer(app)
 	}
 	srv = srv.WithDecryptor(decryptor).WithTrustedSubnet(trustedSubnet)
 	log.Println("Listening...")

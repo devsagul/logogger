@@ -1,8 +1,9 @@
 package server
 
 import (
-	"logogger/internal/crypt"
 	"net"
+
+	"logogger/internal/crypt"
 )
 
 type Server interface {

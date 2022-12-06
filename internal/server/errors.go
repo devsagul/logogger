@@ -3,10 +3,12 @@ package server
 import (
 	"errors"
 	"fmt"
-	"google.golang.org/grpc/codes"
-	"logogger/internal/storage"
 	"net/http"
 	"strings"
+
+	"google.golang.org/grpc/codes"
+
+	"logogger/internal/storage"
 )
 
 type applicationError struct {

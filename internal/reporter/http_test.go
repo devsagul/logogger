@@ -75,7 +75,8 @@ func TestReportMetrics(t *testing.T) {
 	defer server.Close()
 	encryptor, err := crypt.NewEncryptor("")
 	assert.NoError(t, err)
-	poller, err := NewReporter(encryptor)
+	poller, err := NewHTTPReporter(encryptor)
+	assert.NoError(t, err)
 	err = poller.ReportMetrics(context.Background(), l, server.URL)
 
 	if err != nil {
@@ -106,7 +107,8 @@ func TestReportMetrics_FaultyServer(t *testing.T) {
 	server := httptest.NewServer(handler)
 	encryptor, err := crypt.NewEncryptor("")
 	assert.NoError(t, err)
-	poller, err := NewReporter(encryptor)
+	poller, err := NewHTTPReporter(encryptor)
+	assert.NoError(t, err)
 
 	err1 := poller.ReportMetrics(context.Background(), l, server.URL)
 	server.Close()
@@ -169,7 +171,8 @@ func TestReportBatchMetrics(t *testing.T) {
 	defer server.Close()
 	encryptor, err := crypt.NewEncryptor("")
 	assert.NoError(t, err)
-	poller, err := NewReporter(encryptor)
+	poller, err := NewHTTPReporter(encryptor)
+	assert.NoError(t, err)
 	err = poller.ReportMetricsBatches(context.Background(), l, server.URL)
 
 	if err != nil {

@@ -2,17 +2,19 @@ package server
 
 import (
 	"context"
+	"net"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+
 	"logogger/internal/crypt"
 	"logogger/internal/proto"
 	"logogger/internal/schema"
-	"net"
 )
 
-type GrpcServer struct {
+type GRPCServer struct {
 	proto.UnimplementedLogoggerServer
 
 	app           *App
@@ -21,7 +23,7 @@ type GrpcServer struct {
 	wrapped       *grpc.Server
 }
 
-func (server *GrpcServer) RetrieveValue(ctx context.Context, req *proto.MetricsValue) (*proto.MetricsValue, error) {
+func (server *GRPCServer) RetrieveValue(ctx context.Context, req *proto.MetricsValue) (*proto.MetricsValue, error) {
 	var m schema.Metrics
 	m.MType = req.Type
 	m.ID = req.Id
@@ -38,7 +40,7 @@ func (server *GrpcServer) RetrieveValue(ctx context.Context, req *proto.MetricsV
 	}, nil
 }
 
-func (server *GrpcServer) ListValues(ctx context.Context, req *proto.Empty) (*proto.MetricsList, error) {
+func (server *GRPCServer) ListValues(ctx context.Context, req *proto.Empty) (*proto.MetricsList, error) {
 	values, err := server.app.listValues(ctx)
 	if err != nil {
 		return nil, status.Errorf(err.grpcStatus, err.wrapped.Error())
@@ -58,7 +60,7 @@ func (server *GrpcServer) ListValues(ctx context.Context, req *proto.Empty) (*pr
 	return &proto.MetricsList{Metrics: res}, nil
 }
 
-func (server *GrpcServer) UpdateValue(ctx context.Context, req *proto.MetricsValue) (*proto.MetricsValue, error) {
+func (server *GRPCServer) UpdateValue(ctx context.Context, req *proto.MetricsValue) (*proto.MetricsValue, error) {
 	var m schema.Metrics
 	m.MType = req.Type
 	m.ID = req.Id
@@ -78,7 +80,7 @@ func (server *GrpcServer) UpdateValue(ctx context.Context, req *proto.MetricsVal
 	}, nil
 }
 
-func (server *GrpcServer) UpdateValues(ctx context.Context, req *proto.MetricsList) (*proto.MetricsList, error) {
+func (server *GRPCServer) UpdateValues(ctx context.Context, req *proto.MetricsList) (*proto.MetricsList, error) {
 	var m []schema.Metrics
 	for _, item := range req.Metrics {
 		m = append(m, schema.Metrics{
@@ -108,7 +110,7 @@ func (server *GrpcServer) UpdateValues(ctx context.Context, req *proto.MetricsLi
 	return &proto.MetricsList{Metrics: res}, nil
 }
 
-func (server *GrpcServer) Ping(ctx context.Context, req *proto.Empty) (*proto.Empty, error) {
+func (server *GRPCServer) Ping(ctx context.Context, req *proto.Empty) (*proto.Empty, error) {
 	err := server.app.ping(ctx)
 	if err != nil {
 		return nil, status.Errorf(err.grpcStatus, err.wrapped.Error())
@@ -116,7 +118,7 @@ func (server *GrpcServer) Ping(ctx context.Context, req *proto.Empty) (*proto.Em
 	return nil, nil
 }
 
-func (server *GrpcServer) Serve(address string) error {
+func (server *GRPCServer) Serve(address string) error {
 	listen, err := net.Listen("tcp", address)
 	if err != nil {
 		return err
@@ -133,19 +135,19 @@ func (server *GrpcServer) Serve(address string) error {
 	return server.wrapped.Serve(listen)
 }
 
-func (server *GrpcServer) Shutdown(idleConnsClosed chan<- struct{}) error {
+func (server *GRPCServer) Shutdown(idleConnsClosed chan<- struct{}) error {
 	server.wrapped.GracefulStop()
 	close(idleConnsClosed)
 	return nil
 }
 
-func (server *GrpcServer) decryptionInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+func (server *GRPCServer) decryptionInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	// is theoretically possible by using custom codecs, but I was
 	// unable to do that in any sensible manner
 	return handler(ctx, req)
 }
 
-func (server *GrpcServer) trustedSubnetInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+func (server *GRPCServer) trustedSubnetInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	if server.trustedSubnet == nil {
 		return handler(ctx, req)
 	}
@@ -169,18 +171,18 @@ func (server *GrpcServer) trustedSubnetInterceptor(ctx context.Context, req inte
 	return handler(ctx, req)
 }
 
-func (server *GrpcServer) WithDecryptor(decryptor crypt.Decryptor) Server {
+func (server *GRPCServer) WithDecryptor(decryptor crypt.Decryptor) Server {
 	server.decryptor = decryptor
 	return server
 }
 
-func (server *GrpcServer) WithTrustedSubnet(trustedSubnet *net.IPNet) Server {
+func (server *GRPCServer) WithTrustedSubnet(trustedSubnet *net.IPNet) Server {
 	server.trustedSubnet = trustedSubnet
 	return server
 }
 
-func NewGrpcServer(app *App) *GrpcServer {
-	server := new(GrpcServer)
+func NewGRPCServer(app *App) *GRPCServer {
+	server := new(GRPCServer)
 	server.app = app
 	server.decryptor = crypt.NoOpDecryptor{}
 	server.trustedSubnet = nil

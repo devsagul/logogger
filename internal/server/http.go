@@ -5,19 +5,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"io"
 	"log"
-	"logogger/internal/crypt"
-	"logogger/internal/schema"
 	"net"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+
+	"logogger/internal/crypt"
+	"logogger/internal/schema"
 )
 
-type HttpServer struct {
+type HTTPServer struct {
 	app           *App
 	decryptor     crypt.Decryptor
 	trustedSubnet *net.IPNet
@@ -25,12 +27,12 @@ type HttpServer struct {
 	wrapped       http.Server
 }
 
-func (server *HttpServer) Serve(address string) error {
+func (server *HTTPServer) Serve(address string) error {
 	server.wrapped = http.Server{Addr: address, Handler: server.Router}
 	return server.wrapped.ListenAndServe()
 }
 
-func (server *HttpServer) Shutdown(idleConnsClosed chan<- struct{}) error {
+func (server *HTTPServer) Shutdown(idleConnsClosed chan<- struct{}) error {
 	err := server.wrapped.Shutdown(context.Background())
 	close(idleConnsClosed)
 	return err
@@ -57,7 +59,7 @@ func makeHandler(handler serverHandler) http.HandlerFunc {
 	}
 }
 
-func (server *HttpServer) retrieveValue(
+func (server *HTTPServer) retrieveValue(
 	w http.ResponseWriter,
 	r *http.Request,
 ) *applicationError {
@@ -77,7 +79,7 @@ func (server *HttpServer) retrieveValue(
 	return nil
 }
 
-func (server *HttpServer) updateValue(w http.ResponseWriter, r *http.Request) *applicationError {
+func (server *HTTPServer) updateValue(w http.ResponseWriter, r *http.Request) *applicationError {
 	valueType := chi.URLParam(r, "Type")
 	name := chi.URLParam(r, "Name")
 	rawValue := chi.URLParam(r, "Value")
@@ -95,7 +97,7 @@ func (server *HttpServer) updateValue(w http.ResponseWriter, r *http.Request) *a
 	return nil
 }
 
-func (server *HttpServer) listValues(w http.ResponseWriter, r *http.Request) *applicationError {
+func (server *HTTPServer) listValues(w http.ResponseWriter, r *http.Request) *applicationError {
 	list, err := server.app.listValues(r.Context())
 	if err != nil {
 		return err
@@ -120,7 +122,7 @@ func (server *HttpServer) listValues(w http.ResponseWriter, r *http.Request) *ap
 	return nil
 }
 
-func (server *HttpServer) updateValueJSON(w http.ResponseWriter, r *http.Request) *applicationError {
+func (server *HTTPServer) updateValueJSON(w http.ResponseWriter, r *http.Request) *applicationError {
 	if r.Body == nil {
 		return convertError(
 			ValidationError(
@@ -161,7 +163,7 @@ func (server *HttpServer) updateValueJSON(w http.ResponseWriter, r *http.Request
 	return nil
 }
 
-func (server *HttpServer) updateValuesJSON(w http.ResponseWriter, r *http.Request) *applicationError {
+func (server *HTTPServer) updateValuesJSON(w http.ResponseWriter, r *http.Request) *applicationError {
 	if r.Body == nil {
 		return convertError(ValidationError("empty body"))
 	}
@@ -199,7 +201,7 @@ func (server *HttpServer) updateValuesJSON(w http.ResponseWriter, r *http.Reques
 	return nil
 }
 
-func (server *HttpServer) retrieveValueJSON(w http.ResponseWriter, r *http.Request) *applicationError {
+func (server *HTTPServer) retrieveValueJSON(w http.ResponseWriter, r *http.Request) *applicationError {
 	if r.Body == nil {
 		return convertError(ValidationError("empty body"))
 	}
@@ -232,7 +234,7 @@ func (server *HttpServer) retrieveValueJSON(w http.ResponseWriter, r *http.Reque
 	return nil
 }
 
-func (server *HttpServer) ping(w http.ResponseWriter, r *http.Request) *applicationError {
+func (server *HTTPServer) ping(w http.ResponseWriter, r *http.Request) *applicationError {
 	err := server.app.ping(r.Context())
 	log.Printf("Ping result: %v", err)
 	if err != nil {
@@ -242,8 +244,8 @@ func (server *HttpServer) ping(w http.ResponseWriter, r *http.Request) *applicat
 	return nil
 }
 
-func NewHttpServer(app *App) *HttpServer {
-	server := new(HttpServer)
+func NewHTTPServer(app *App) *HTTPServer {
+	server := new(HTTPServer)
 	server.app = app
 	server.decryptor = crypt.NoOpDecryptor{}
 	server.trustedSubnet = nil
@@ -271,17 +273,17 @@ func NewHttpServer(app *App) *HttpServer {
 	return server
 }
 
-func (server *HttpServer) WithDecryptor(decryptor crypt.Decryptor) Server {
+func (server *HTTPServer) WithDecryptor(decryptor crypt.Decryptor) Server {
 	server.decryptor = decryptor
 	return server
 }
 
-func (server *HttpServer) WithTrustedSubnet(trustedSubnet *net.IPNet) Server {
+func (server *HTTPServer) WithTrustedSubnet(trustedSubnet *net.IPNet) Server {
 	server.trustedSubnet = trustedSubnet
 	return server
 }
 
-func (server *HttpServer) decryptionMiddleware() func(handler http.Handler) http.Handler {
+func (server *HTTPServer) decryptionMiddleware() func(handler http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Body != nil {
@@ -309,7 +311,7 @@ func (server *HttpServer) decryptionMiddleware() func(handler http.Handler) http
 	}
 }
 
-func (server *HttpServer) trustedSubnetMiddleware() func(handler http.Handler) http.Handler {
+func (server *HTTPServer) trustedSubnetMiddleware() func(handler http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if server.trustedSubnet == nil {

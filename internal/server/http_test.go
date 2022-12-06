@@ -22,7 +22,7 @@ func TestApp_RetrieveValue(t *testing.T) {
 	err := store.Put(context.Background(), schema.NewCounter("ctrID", 42))
 	assert.NoError(t, err)
 	app := NewApp(store)
-	server := NewHttpServer(app)
+	server := NewHTTPServer(app)
 
 	params := []struct {
 		t     string
@@ -61,7 +61,7 @@ func TestApp_UpdateValue(t *testing.T) {
 	err = store.Put(context.Background(), schema.NewCounter("ctrID", 42))
 	assert.NoError(t, err)
 	app := NewApp(store)
-	server := NewHttpServer(app)
+	server := NewHTTPServer(app)
 
 	params := []struct {
 		t     string
@@ -103,7 +103,7 @@ func TestApp_UpdateValue(t *testing.T) {
 func TestApp_UpdateValueWrongType(t *testing.T) {
 	store := storage.NewMemStorage()
 	app := NewApp(store)
-	server := NewHttpServer(app)
+	server := NewHTTPServer(app)
 
 	url := "/update/stats/ID/42"
 	req, err := http.NewRequest(http.MethodPost, url, nil)
@@ -119,7 +119,7 @@ func TestApp_UpdateValueWrongType(t *testing.T) {
 
 func TestApp_ListMetricsEmpty(t *testing.T) {
 	app := NewApp(storage.NewMemStorage())
-	server := NewHttpServer(app)
+	server := NewHTTPServer(app)
 	req, err := http.NewRequest(http.MethodGet, "/", nil)
 	assert.NoError(t, err)
 	recorder := httptest.NewRecorder()
@@ -143,7 +143,7 @@ func TestApp_ListMetrics(t *testing.T) {
 	assert.NoError(t, err)
 	recorder := httptest.NewRecorder()
 
-	server := NewHttpServer(app)
+	server := NewHTTPServer(app)
 	server.Router.ServeHTTP(recorder, req)
 	responseCode := recorder.Code
 	body := recorder.Body.String()
@@ -164,7 +164,7 @@ func TestApp_UpdateValueJsonNoInput(t *testing.T) {
 	req, err := http.NewRequest(http.MethodPost, "/update/", nil)
 	assert.NoError(t, err)
 	recorder := httptest.NewRecorder()
-	server := NewHttpServer(app)
+	server := NewHTTPServer(app)
 	server.Router.ServeHTTP(recorder, req)
 
 	responseCode := recorder.Code
@@ -177,7 +177,7 @@ func TestApp_UpdateValueJsonNoInput(t *testing.T) {
 func TestApp_UpdateValueJsonInvalidInput(t *testing.T) {
 	store := storage.NewMemStorage()
 	app := NewApp(store)
-	server := NewHttpServer(app)
+	server := NewHTTPServer(app)
 
 	tests := [...]string{
 		"",
@@ -206,7 +206,7 @@ func TestApp_UpdateValueJsonInvalidInput(t *testing.T) {
 func TestApp_UpdateValueJson(t *testing.T) {
 	store := storage.NewMemStorage()
 	app := NewApp(store)
-	server := NewHttpServer(app)
+	server := NewHTTPServer(app)
 
 	params := [...]struct {
 		data     schema.Metrics
@@ -265,7 +265,7 @@ func TestApp_UpdateValueJson(t *testing.T) {
 func TestApp_UpdateValueJSON_WrongType(t *testing.T) {
 	store := storage.NewMemStorage()
 	app := NewApp(store)
-	server := NewHttpServer(app)
+	server := NewHTTPServer(app)
 	d := int64(42)
 	f := 13.37
 	m := schema.Metrics{
@@ -290,7 +290,7 @@ func TestApp_UpdateValueJSON_WrongType(t *testing.T) {
 func TestApp_RetrieveValueJSONNoInput(t *testing.T) {
 	store := storage.NewMemStorage()
 	app := NewApp(store)
-	server := NewHttpServer(app)
+	server := NewHTTPServer(app)
 
 	req, err := http.NewRequest(http.MethodPost, "/value/", nil)
 	assert.NoError(t, err)
@@ -307,7 +307,7 @@ func TestApp_RetrieveValueJSONNoInput(t *testing.T) {
 func TestApp_RetrieveValueJSONInvalidInput(t *testing.T) {
 	store := storage.NewMemStorage()
 	app := NewApp(store)
-	server := NewHttpServer(app)
+	server := NewHTTPServer(app)
 
 	tests := [...]string{
 		"",
@@ -333,7 +333,7 @@ func TestApp_RetrieveValueJSONInvalidInput(t *testing.T) {
 func TestApp_RetrieveValueJSON(t *testing.T) {
 	store := storage.NewMemStorage()
 	app := NewApp(store)
-	server := NewHttpServer(app)
+	server := NewHTTPServer(app)
 
 	m := schema.NewCounter("ctrID", 42)
 	marshalled, err := json.Marshal(m)
@@ -371,7 +371,7 @@ func TestApp_RetrieveValueJSON(t *testing.T) {
 func TestApp_RetrieveValueJSONWrongType(t *testing.T) {
 	store := storage.NewMemStorage()
 	app := NewApp(store)
-	server := NewHttpServer(app)
+	server := NewHTTPServer(app)
 	m := schema.Metrics{
 		ID: "id", MType: "statistics",
 	}
@@ -394,7 +394,7 @@ func TestApp_RetrieveValueJSONWrongType(t *testing.T) {
 func TestApp_UpdateValueJSON(t *testing.T) {
 	store := storage.NewMemStorage()
 	app := NewApp(store)
-	server := NewHttpServer(app)
+	server := NewHTTPServer(app)
 
 	m := schema.NewCounter("ctrID", 42)
 	_, err := json.Marshal(m)
@@ -430,7 +430,7 @@ func TestApp_UpdateValueJSON(t *testing.T) {
 func TestApp_UpdateValueJSONWrongType(t *testing.T) {
 	store := storage.NewMemStorage()
 	app := NewApp(store)
-	server := NewHttpServer(app)
+	server := NewHTTPServer(app)
 	m := schema.Metrics{
 		ID: "id", MType: "statistics",
 	}
@@ -453,7 +453,7 @@ func TestApp_UpdateValueJSONWrongType(t *testing.T) {
 func TestApp_FaultyStorage(t *testing.T) {
 	store := faultyStorage{}
 	app := NewApp(store)
-	server := NewHttpServer(app)
+	server := NewHTTPServer(app)
 
 	params := []struct {
 		url    string
@@ -489,7 +489,7 @@ func TestApp_FaultyStorage(t *testing.T) {
 func TestApp_Ping(t *testing.T) {
 	store := storage.NewMemStorage()
 	app := NewApp(store)
-	server := NewHttpServer(app)
+	server := NewHTTPServer(app)
 
 	req, err := http.NewRequest(http.MethodGet, "/ping", nil)
 	assert.NoError(t, err)
@@ -504,7 +504,7 @@ func TestApp_Ping(t *testing.T) {
 func TestApp_PingFaulty(t *testing.T) {
 	store := faultyStorage{}
 	app := NewApp(store)
-	server := NewHttpServer(app)
+	server := NewHTTPServer(app)
 
 	req, err := http.NewRequest(http.MethodGet, "/ping", nil)
 	assert.NoError(t, err)
