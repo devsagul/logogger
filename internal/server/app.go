@@ -42,7 +42,7 @@ func (app *App) retrieveValue(
 	case schema.MetricsTypeGauge:
 	default:
 		return schema.NewEmptyMetrics(), convertError(
-			ValidationError(
+			InvalidTypeError(
 				fmt.Sprintf(
 					"Unable to perform requested action on metrics type %s", req.MType,
 				),
@@ -104,7 +104,7 @@ func (app *App) updateValue(
 	case schema.MetricsTypeGauge:
 		err = app.store.Put(ctx, req)
 	default:
-		return schema.NewEmptyMetrics(), convertError(ValidationError(
+		return schema.NewEmptyMetrics(), convertError(InvalidTypeError(
 			fmt.Sprintf(
 				"Unable to perform requested action on metrics type %s", req.MType,
 			),
@@ -172,7 +172,7 @@ func (app *App) bulkUpdateValues(ctx context.Context, values []schema.Metrics) (
 		case schema.MetricsTypeGauge:
 			gauges = append(gauges, value)
 		default:
-			return nil, convertError(ValidationError(
+			return nil, convertError(InvalidTypeError(
 				fmt.Sprintf(
 					"Unable to perform requested action on metrics type %s", value.MType,
 				),

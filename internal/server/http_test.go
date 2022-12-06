@@ -34,7 +34,7 @@ func TestApp_RetrieveValue(t *testing.T) {
 		{schema.MetricsTypeCounter, "ctrID", "42", http.StatusOK, true},
 		{schema.MetricsTypeGauge, "ctrID", "actual type in storage is counter", http.StatusConflict, false},
 		{schema.MetricsTypeCounter, "nonExistent", "could not find metrics", http.StatusNotFound, false},
-		{"stats", "nonExistent", "Unable to perform requested action", http.StatusBadRequest, false},
+		{"stats", "nonExistent", "Unable to perform requested action", http.StatusNotImplemented, false},
 	}
 	for _, param := range params {
 		url := fmt.Sprintf("/value/%s/%s", param.t, param.id)
@@ -113,7 +113,7 @@ func TestApp_UpdateValueWrongType(t *testing.T) {
 	responseCode := recorder.Code
 	body := recorder.Body.String()
 
-	assert.Equal(t, http.StatusBadRequest, responseCode)
+	assert.Equal(t, http.StatusNotImplemented, responseCode)
 	assert.Contains(t, body, "Unable to perform requested action")
 }
 
@@ -283,7 +283,7 @@ func TestApp_UpdateValueJSON_WrongType(t *testing.T) {
 	responseCode := recorder.Code
 	respBody := recorder.Body.String()
 
-	assert.Equal(t, http.StatusBadRequest, responseCode)
+	assert.Equal(t, http.StatusNotImplemented, responseCode)
 	assert.Contains(t, respBody, "Unable to perform requested action")
 }
 
@@ -387,7 +387,7 @@ func TestApp_RetrieveValueJSONWrongType(t *testing.T) {
 	responseCode := recorder.Code
 	respBody := recorder.Body.String()
 
-	assert.Equal(t, http.StatusBadRequest, responseCode)
+	assert.Equal(t, http.StatusNotImplemented, responseCode)
 	assert.Contains(t, respBody, "Unable to perform requested action")
 }
 
@@ -446,7 +446,7 @@ func TestApp_UpdateValueJSONWrongType(t *testing.T) {
 	responseCode := recorder.Code
 	respBody := recorder.Body.String()
 
-	assert.Equal(t, http.StatusBadRequest, responseCode)
+	assert.Equal(t, http.StatusNotImplemented, responseCode)
 	assert.Contains(t, respBody, "Unable to perform requested action")
 }
 

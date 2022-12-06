@@ -38,7 +38,7 @@ func ParseMetric(valueType string, name string, rawValue string) (schema.Metrics
 		}
 		return schema.NewGauge(name, value), nil
 	default:
-		return schema.NewEmptyMetrics(), ValidationError(
+		return schema.NewEmptyMetrics(), InvalidTypeError(
 			fmt.Sprintf(
 				"Unable to perform requested action on metrics type %s", valueType,
 			),

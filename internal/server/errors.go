@@ -29,6 +29,18 @@ func ValidationError(messages ...string) *validationError {
 	return &validationError{messages}
 }
 
+type invalidTypeError struct {
+	message string
+}
+
+func (e *invalidTypeError) Error() string {
+	return "Invalid type: " + e.message
+}
+
+func InvalidTypeError(message string) *invalidTypeError {
+	return &invalidTypeError{message}
+}
+
 func convertError(e error) *applicationError {
 	switch err := e.(type) {
 	case nil:
@@ -38,6 +50,12 @@ func convertError(e error) *applicationError {
 			err,
 			http.StatusBadRequest,
 			codes.InvalidArgument,
+		}
+	case *invalidTypeError:
+		return &applicationError{
+			err,
+			http.StatusNotImplemented,
+			codes.Unimplemented,
 		}
 	case *storage.NotFound:
 		return &applicationError{
