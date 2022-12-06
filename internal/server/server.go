@@ -28,6 +28,7 @@ type App struct {
 	Router    *chi.Mux
 	key       string
 	sync      bool
+	trustedSubnet net.CIDR
 }
 
 type errorHTTPHandler func(http.ResponseWriter, *http.Request) error
@@ -427,6 +428,7 @@ func NewApp(
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(60 * time.Second))
 	r.Use(middleware.Compress(5))
+	r.Use(app.trustedSubnetMiddleWare)
 
 	r.With(middleware.SetHeader("Content-Type", "text/plain")).Post("/update/{Type}/{Name}/{Value}", app.newHandler(app.updateValue))
 	r.With(middleware.SetHeader("Content-Type", "text/plain")).Get("/value/{Type}/{Name}", app.newHandler(app.retrieveValue))
@@ -470,4 +472,31 @@ func (app *App) WithKey(key string) *App {
 func (app *App) WithDecryptor(decryptor crypt.Decryptor) *App {
 	app.decryptor = decryptor
 	return app
+}
+
+func (app *App) WithTrustedSubnet(trustedSubnet net.CIDR) *App {
+	app.trustedSubnet = trustedSubnet
+	return app
+}
+
+func (app *App) trustedSubnetMiddleWare(next http.Handler) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if len(app.trustedSubnet) == 0 {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		rawIP := r.Header.Get("X-Real-IP")
+		ip := net.ParseIP(rawIP)
+		if ip == nil {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		if !app.trustedSubnet.Contains(ip) {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }

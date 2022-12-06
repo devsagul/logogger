@@ -23,6 +23,7 @@ type Reporter struct {
 	batches   bool
 	wg        sync.WaitGroup
 	encryptor crypt.Encryptor
+	ip	      string
 }
 
 func (reporter *Reporter) ReportMetrics(ctx context.Context, l []schema.Metrics, host string) error {
@@ -35,7 +36,7 @@ func (reporter *Reporter) ReportMetrics(ctx context.Context, l []schema.Metrics,
 		m := m
 		url := fmt.Sprintf("%s/update/", host)
 		eg.Go(utils.WrapGoroutinePanic(func() error {
-			return postSingleRequest(ctx, url, m, reporter.encryptor)
+			return postSingleRequest(ctx, url, m, reporter.encryptor, reportet.ip)
 		}))
 	}
 
@@ -54,7 +55,7 @@ func (reporter *Reporter) ReportMetricsBatches(ctx context.Context, l []schema.M
 		return nil
 	}
 	url := fmt.Sprintf("%s/updates/", host)
-	code, err := postBatchRequest(ctx, url, l, reporter.encryptor)
+	code, err := postBatchRequest(ctx, url, l, reporter.encryptor, reporter.ip)
 
 	// if batches url is unavailable, we should use ordinary API
 	if code != http.StatusNotFound {
@@ -68,11 +69,15 @@ func (reporter *Reporter) Shutdown() {
 	reporter.wg.Wait()
 }
 
-func NewReporter(encryptor crypt.Encryptor) *Reporter {
-	return &Reporter{batches: true, encryptor: encryptor, wg: sync.WaitGroup{}}
+func NewReporter(encryptor crypt.Encryptor) (*Reporter, error) {
+	ip, err := getgetRealIP()
+	if err != nil {
+		return nil, err
+	}
+	return &Reporter{batches: true, encryptor: encryptor, wg: sync.WaitGroup{}, ip}
 }
 
-func postSingleRequest(ctx context.Context, url string, m schema.Metrics, encryptor crypt.Encryptor) error {
+func postSingleRequest(ctx context.Context, url string, m schema.Metrics, encryptor crypt.Encryptor, ip string) error {
 	data, err := json.Marshal(&m)
 	if err != nil {
 		return err
@@ -84,7 +89,7 @@ func postSingleRequest(ctx context.Context, url string, m schema.Metrics, encryp
 	return err
 }
 
-func postBatchRequest(ctx context.Context, url string, l []schema.Metrics, encryptor crypt.Encryptor) (int, error) {
+func postBatchRequest(ctx context.Context, url string, l []schema.Metrics, encryptor crypt.Encryptor, ip string) (int, error) {
 	data, err := json.Marshal(&l)
 	if err != nil {
 		return 0, err
@@ -97,7 +102,7 @@ func postBatchRequest(ctx context.Context, url string, l []schema.Metrics, encry
 	})
 }
 
-func postRequest(ctx context.Context, url string, data []byte, encryptor crypt.Encryptor, headers map[string]string) (int, error) {
+func postRequest(ctx context.Context, url string, data []byte, encryptor crypt.Encryptor, headers map[string]string, ip string) (int, error) {
 	id, err := uuid.NewRandom()
 	if err != nil {
 		return 0, err
@@ -117,6 +122,8 @@ func postRequest(ctx context.Context, url string, data []byte, encryptor crypt.E
 	for key, value := range headers {
 		request.Header.Set(key, value)
 	}
+
+	request.Header.Set("X-Real-IP", ip)
 
 	client := &http.Client{}
 
@@ -139,3 +146,16 @@ func postRequest(ctx context.Context, url string, data []byte, encryptor crypt.E
 	}
 	return code, nil
 }
+
+func getgetRealIP() (string, err) {
+	addrs, err := net.InterfaceAddrs()
+    if err != nil {
+        return "", err
+    }
+    for _, address := range addrs {
+        if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			return ipnet.IP.String(), nil
+        }
+    }
+    return "", errors.New("unable to obtain IP address")
+} 

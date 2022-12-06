@@ -38,6 +38,7 @@ type config struct {
 	StoreFile        string        `env:"STORE_FILE" json:"store_file"`
 	Key              string        `env:"KEY" json:"key"`
 	DatabaseDSN      string        `env:"DATABASE_DSN" json:"database_dsn"`
+	TrustedSubnet	 string		   `env:"TRUSTED_SUBNET" json:"trusted_subnet"`
 	StoreInterval    time.Duration `env:"STORE_INTERVAL"`
 	Restore          bool          `env:"RESTORE" json:"restore"`
 }
@@ -53,6 +54,7 @@ func init() {
 	flag.StringVar(&cfg.Key, "k", "", "Secret key to sign metrics (should be shared between server and agent)")
 	flag.StringVar(&cfg.DatabaseDSN, "d", "", "Database connection string")
 	flag.StringVar(&cfg.ConfigFilePath, "c", "", "Path to JSON configuration")
+	flag.TrustedSubnet(&cfg.TrustedSubnet, "t", "", "CIDR representation of trusted subnet")
 }
 
 func main() {
