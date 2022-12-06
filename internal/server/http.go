@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/go-chi/chi/v5"
@@ -21,6 +22,18 @@ type HttpServer struct {
 	decryptor     crypt.Decryptor
 	trustedSubnet *net.IPNet
 	Router        chi.Router
+	wrapped       http.Server
+}
+
+func (server *HttpServer) Serve(address string) error {
+	server.wrapped = http.Server{Addr: address, Handler: server.Router}
+	return server.wrapped.ListenAndServe()
+}
+
+func (server *HttpServer) Shutdown(idleConnsClosed chan<- struct{}) error {
+	err := server.wrapped.Shutdown(context.Background())
+	close(idleConnsClosed)
+	return err
 }
 
 type serverHandler func(w http.ResponseWriter, r *http.Request) *applicationError
@@ -258,12 +271,12 @@ func NewHttpServer(app *App) *HttpServer {
 	return server
 }
 
-func (server *HttpServer) WithDecryptor(decryptor crypt.Decryptor) *HttpServer {
+func (server *HttpServer) WithDecryptor(decryptor crypt.Decryptor) Server {
 	server.decryptor = decryptor
 	return server
 }
 
-func (server *HttpServer) WithTrustedSubnet(trustedSubnet *net.IPNet) *HttpServer {
+func (server *HttpServer) WithTrustedSubnet(trustedSubnet *net.IPNet) Server {
 	server.trustedSubnet = trustedSubnet
 	return server
 }

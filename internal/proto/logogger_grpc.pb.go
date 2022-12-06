@@ -23,10 +23,10 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type LogoggerClient interface {
 	RetrieveValue(ctx context.Context, in *MetricsValue, opts ...grpc.CallOption) (*MetricsValue, error)
-	ListValues(ctx context.Context, in *EmptyMessage, opts ...grpc.CallOption) (Logogger_ListValuesClient, error)
+	ListValues(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MetricsList, error)
 	UpdateValue(ctx context.Context, in *MetricsValue, opts ...grpc.CallOption) (*MetricsValue, error)
-	UpdateValues(ctx context.Context, in *MetricsList, opts ...grpc.CallOption) (Logogger_UpdateValuesClient, error)
-	Ping(ctx context.Context, in *EmptyMessage, opts ...grpc.CallOption) (*EmptyMessage, error)
+	UpdateValues(ctx context.Context, in *MetricsList, opts ...grpc.CallOption) (*MetricsList, error)
+	Ping(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type logoggerClient struct {
@@ -46,36 +46,13 @@ func (c *logoggerClient) RetrieveValue(ctx context.Context, in *MetricsValue, op
 	return out, nil
 }
 
-func (c *logoggerClient) ListValues(ctx context.Context, in *EmptyMessage, opts ...grpc.CallOption) (Logogger_ListValuesClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Logogger_ServiceDesc.Streams[0], "/logogger.Logogger/ListValues", opts...)
+func (c *logoggerClient) ListValues(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MetricsList, error) {
+	out := new(MetricsList)
+	err := c.cc.Invoke(ctx, "/logogger.Logogger/ListValues", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &logoggerListValuesClient{stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
-}
-
-type Logogger_ListValuesClient interface {
-	Recv() (*MetricsValue, error)
-	grpc.ClientStream
-}
-
-type logoggerListValuesClient struct {
-	grpc.ClientStream
-}
-
-func (x *logoggerListValuesClient) Recv() (*MetricsValue, error) {
-	m := new(MetricsValue)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
+	return out, nil
 }
 
 func (c *logoggerClient) UpdateValue(ctx context.Context, in *MetricsValue, opts ...grpc.CallOption) (*MetricsValue, error) {
@@ -87,40 +64,17 @@ func (c *logoggerClient) UpdateValue(ctx context.Context, in *MetricsValue, opts
 	return out, nil
 }
 
-func (c *logoggerClient) UpdateValues(ctx context.Context, in *MetricsList, opts ...grpc.CallOption) (Logogger_UpdateValuesClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Logogger_ServiceDesc.Streams[1], "/logogger.Logogger/UpdateValues", opts...)
+func (c *logoggerClient) UpdateValues(ctx context.Context, in *MetricsList, opts ...grpc.CallOption) (*MetricsList, error) {
+	out := new(MetricsList)
+	err := c.cc.Invoke(ctx, "/logogger.Logogger/UpdateValues", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &logoggerUpdateValuesClient{stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
+	return out, nil
 }
 
-type Logogger_UpdateValuesClient interface {
-	Recv() (*MetricsValue, error)
-	grpc.ClientStream
-}
-
-type logoggerUpdateValuesClient struct {
-	grpc.ClientStream
-}
-
-func (x *logoggerUpdateValuesClient) Recv() (*MetricsValue, error) {
-	m := new(MetricsValue)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
-func (c *logoggerClient) Ping(ctx context.Context, in *EmptyMessage, opts ...grpc.CallOption) (*EmptyMessage, error) {
-	out := new(EmptyMessage)
+func (c *logoggerClient) Ping(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
 	err := c.cc.Invoke(ctx, "/logogger.Logogger/Ping", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -133,10 +87,10 @@ func (c *logoggerClient) Ping(ctx context.Context, in *EmptyMessage, opts ...grp
 // for forward compatibility
 type LogoggerServer interface {
 	RetrieveValue(context.Context, *MetricsValue) (*MetricsValue, error)
-	ListValues(*EmptyMessage, Logogger_ListValuesServer) error
+	ListValues(context.Context, *Empty) (*MetricsList, error)
 	UpdateValue(context.Context, *MetricsValue) (*MetricsValue, error)
-	UpdateValues(*MetricsList, Logogger_UpdateValuesServer) error
-	Ping(context.Context, *EmptyMessage) (*EmptyMessage, error)
+	UpdateValues(context.Context, *MetricsList) (*MetricsList, error)
+	Ping(context.Context, *Empty) (*Empty, error)
 	mustEmbedUnimplementedLogoggerServer()
 }
 
@@ -147,16 +101,16 @@ type UnimplementedLogoggerServer struct {
 func (UnimplementedLogoggerServer) RetrieveValue(context.Context, *MetricsValue) (*MetricsValue, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RetrieveValue not implemented")
 }
-func (UnimplementedLogoggerServer) ListValues(*EmptyMessage, Logogger_ListValuesServer) error {
-	return status.Errorf(codes.Unimplemented, "method ListValues not implemented")
+func (UnimplementedLogoggerServer) ListValues(context.Context, *Empty) (*MetricsList, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListValues not implemented")
 }
 func (UnimplementedLogoggerServer) UpdateValue(context.Context, *MetricsValue) (*MetricsValue, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateValue not implemented")
 }
-func (UnimplementedLogoggerServer) UpdateValues(*MetricsList, Logogger_UpdateValuesServer) error {
-	return status.Errorf(codes.Unimplemented, "method UpdateValues not implemented")
+func (UnimplementedLogoggerServer) UpdateValues(context.Context, *MetricsList) (*MetricsList, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateValues not implemented")
 }
-func (UnimplementedLogoggerServer) Ping(context.Context, *EmptyMessage) (*EmptyMessage, error) {
+func (UnimplementedLogoggerServer) Ping(context.Context, *Empty) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
 }
 func (UnimplementedLogoggerServer) mustEmbedUnimplementedLogoggerServer() {}
@@ -190,25 +144,22 @@ func _Logogger_RetrieveValue_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Logogger_ListValues_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(EmptyMessage)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
+func _Logogger_ListValues_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
 	}
-	return srv.(LogoggerServer).ListValues(m, &logoggerListValuesServer{stream})
-}
-
-type Logogger_ListValuesServer interface {
-	Send(*MetricsValue) error
-	grpc.ServerStream
-}
-
-type logoggerListValuesServer struct {
-	grpc.ServerStream
-}
-
-func (x *logoggerListValuesServer) Send(m *MetricsValue) error {
-	return x.ServerStream.SendMsg(m)
+	if interceptor == nil {
+		return srv.(LogoggerServer).ListValues(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/logogger.Logogger/ListValues",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(LogoggerServer).ListValues(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _Logogger_UpdateValue_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -229,29 +180,26 @@ func _Logogger_UpdateValue_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Logogger_UpdateValues_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(MetricsList)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
+func _Logogger_UpdateValues_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MetricsList)
+	if err := dec(in); err != nil {
+		return nil, err
 	}
-	return srv.(LogoggerServer).UpdateValues(m, &logoggerUpdateValuesServer{stream})
-}
-
-type Logogger_UpdateValuesServer interface {
-	Send(*MetricsValue) error
-	grpc.ServerStream
-}
-
-type logoggerUpdateValuesServer struct {
-	grpc.ServerStream
-}
-
-func (x *logoggerUpdateValuesServer) Send(m *MetricsValue) error {
-	return x.ServerStream.SendMsg(m)
+	if interceptor == nil {
+		return srv.(LogoggerServer).UpdateValues(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/logogger.Logogger/UpdateValues",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(LogoggerServer).UpdateValues(ctx, req.(*MetricsList))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _Logogger_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(EmptyMessage)
+	in := new(Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -263,7 +211,7 @@ func _Logogger_Ping_Handler(srv interface{}, ctx context.Context, dec func(inter
 		FullMethod: "/logogger.Logogger/Ping",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(LogoggerServer).Ping(ctx, req.(*EmptyMessage))
+		return srv.(LogoggerServer).Ping(ctx, req.(*Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -280,25 +228,22 @@ var Logogger_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Logogger_RetrieveValue_Handler,
 		},
 		{
+			MethodName: "ListValues",
+			Handler:    _Logogger_ListValues_Handler,
+		},
+		{
 			MethodName: "UpdateValue",
 			Handler:    _Logogger_UpdateValue_Handler,
+		},
+		{
+			MethodName: "UpdateValues",
+			Handler:    _Logogger_UpdateValues_Handler,
 		},
 		{
 			MethodName: "Ping",
 			Handler:    _Logogger_Ping_Handler,
 		},
 	},
-	Streams: []grpc.StreamDesc{
-		{
-			StreamName:    "ListValues",
-			Handler:       _Logogger_ListValues_Handler,
-			ServerStreams: true,
-		},
-		{
-			StreamName:    "UpdateValues",
-			Handler:       _Logogger_UpdateValues_Handler,
-			ServerStreams: true,
-		},
-	},
+	Streams:  []grpc.StreamDesc{},
 	Metadata: "internal/proto/logogger.proto",
 }

@@ -9,7 +9,6 @@ import (
 	"io"
 	"log"
 	"net"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -42,6 +41,7 @@ type config struct {
 	TrustedSubnet    string        `env:"TRUSTED_SUBNET" json:"trusted_subnet"`
 	StoreInterval    time.Duration `env:"STORE_INTERVAL"`
 	Restore          bool          `env:"RESTORE" json:"restore"`
+	Protocol         string        `env:"PROTOCOL" json:"protocol"`
 }
 
 var cfg config
@@ -56,6 +56,7 @@ func init() {
 	flag.StringVar(&cfg.DatabaseDSN, "d", "", "Database connection string")
 	flag.StringVar(&cfg.ConfigFilePath, "c", "", "Path to JSON configuration")
 	flag.StringVar(&cfg.TrustedSubnet, "t", "", "CIDR representation of trusted subnet")
+	flag.StringVar(&cfg.Protocol, "p", "http", "Communication protocol (http/grpc)")
 }
 
 func main() {
@@ -172,23 +173,31 @@ func main() {
 
 	log.Println("Initializing application...")
 	app := server.NewApp(store).WithDumper(d).WithDumpInterval(cfg.StoreInterval).WithKey(cfg.Key)
-	srv := server.NewHttpServer(app).WithDecryptor(decryptor).WithTrustedSubnet(trustedSubnet)
+
+	var srv server.Server
+
+	if cfg.Protocol == "grpc" {
+		srv = server.NewGrpcServer(app)
+	} else {
+		srv = server.NewHttpServer(app)
+	}
+	srv = srv.WithDecryptor(decryptor).WithTrustedSubnet(trustedSubnet)
 	log.Println("Listening...")
-	server := http.Server{Addr: cfg.Address, Handler: srv.Router}
+
 	idleConnsClosed := make(chan struct{})
 	sigint := make(chan os.Signal, 1)
 	signal.Notify(sigint, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go func() {
 		<-sigint
-		if err := server.Shutdown(context.Background()); err != nil {
-			log.Printf("HTTP server Shutdown: %v", err)
+		err = srv.Shutdown(idleConnsClosed)
+		if err != nil {
+			log.Fatal("Error Shutting down the Server : ", err)
 		}
-		close(idleConnsClosed)
 	}()
 
-	err = server.ListenAndServe()
+	err = srv.Serve(cfg.Address)
 	if err != nil {
-		log.Fatal("Error Starting the HTTP Server : ", err)
+		log.Fatal("Error Starting the Server : ", err)
 	}
 	<-idleConnsClosed
 	fmt.Println("Server Shutdown gracefully")

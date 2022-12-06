@@ -8,20 +8,20 @@ message MetricsValue {
   string id = 2;
   optional sint64 delta = 3;
   optional double value = 4;
-  optional string hash = 5;
+  string hash = 5;
 }
 
 message MetricsList {
   repeated MetricsValue metrics = 1;
 }
 
-message EmptyMessage{};
+message Empty{};
 
 
 service Logogger {
   rpc RetrieveValue(MetricsValue) returns (MetricsValue);
-  rpc ListValues(EmptyMessage) returns (stream MetricsValue);
+  rpc ListValues(Empty) returns (MetricsList);
   rpc UpdateValue(MetricsValue) returns (MetricsValue);
-  rpc UpdateValues(MetricsList) returns (stream MetricsValue);
-  rpc Ping(EmptyMessage) returns (EmptyMessage);
+  rpc UpdateValues(MetricsList) returns (MetricsList);
+  rpc Ping(Empty) returns (Empty);
 }
