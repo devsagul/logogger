@@ -7,50 +7,24 @@ import (
 	"strconv"
 
 	"logogger/internal/schema"
-	"logogger/internal/storage"
 )
 
 func SafeWrite(w http.ResponseWriter, status int, format string, args ...interface{}) {
 	w.WriteHeader(status)
 	body := fmt.Sprintf(format, args...)
+	if w.Header().Get("Content-Type") == "application/json" {
+		if status >= 300 {
+			body = fmt.Sprintf(`{error: "%s"}`, body)
+		}
+	}
 	_, err := w.Write([]byte(body))
 	if err != nil {
 		log.Printf("Error: could not write response. Cause: %s", err)
 	}
 }
 
-func WriteError(w http.ResponseWriter, e error) {
-	var status int
-	var error string
-	switch err := e.(type) {
-	case nil:
-	case *requestError:
-		status = err.status
-		error = err.body
-	case *validationError:
-		status = http.StatusBadRequest
-		error = err.Error()
-	case *storage.NotFound:
-		status = http.StatusNotFound
-		error = fmt.Sprintf("Could not find metrics with name %s", err.ID)
-	case *storage.IncrementingNonCounterMetrics:
-		status = http.StatusNotImplemented
-		error = fmt.Sprintf("Could not increment metrics of type %s", err.ActualType)
-	case *storage.TypeMismatch:
-		status = http.StatusConflict
-		error = fmt.Sprintf("Requested operation on metrics %s with type %s, but actual type in storage is %s", err.ID, err.Requested, err.Stored)
-	default:
-		status = http.StatusInternalServerError
-		error = "Internal Server Error"
-	}
-	if w.Header().Get("Content-Type") == "application/json" {
-		error = fmt.Sprintf(`{error: "%s"}`, error)
-	}
-	SafeWrite(w, status, error)
-}
-
 func ParseMetric(valueType string, name string, rawValue string) (schema.Metrics, error) {
-	switch schema.MetricsType(valueType) {
+	switch valueType {
 	case schema.MetricsTypeCounter:
 		value, err := strconv.ParseInt(rawValue, 10, 64)
 		if err != nil {
@@ -64,6 +38,10 @@ func ParseMetric(valueType string, name string, rawValue string) (schema.Metrics
 		}
 		return schema.NewGauge(name, value), nil
 	default:
-		return schema.NewEmptyMetrics(), &requestError{fmt.Sprintf("Could not perform requested operation on type %s", valueType), http.StatusNotImplemented}
+		return schema.NewEmptyMetrics(), ValidationError(
+			fmt.Sprintf(
+				"Unable to perform requested action on metrics type %s", valueType,
+			),
+		)
 	}
 }

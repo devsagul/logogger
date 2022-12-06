@@ -11,19 +11,17 @@ import (
 )
 
 type Metrics struct {
-	ID    string      `json:"id"`
-	MType MetricsType `json:"type"`
-	Delta *int64      `json:"delta,omitempty"`
-	Value *float64    `json:"value,omitempty"`
-	Hash  string      `json:"hash,omitempty"`
+	ID    string   `json:"id"`
+	MType string   `json:"type"`
+	Delta *int64   `json:"delta,omitempty"`
+	Value *float64 `json:"value,omitempty"`
+	Hash  string   `json:"hash,omitempty"`
 }
 
-type MetricsType string
-
 const (
-	MetricsTypeCounter MetricsType = "counter"
-	MetricsTypeGauge   MetricsType = "gauge"
-	MetricsTypeEmpty   MetricsType = ""
+	MetricsTypeCounter string = "counter"
+	MetricsTypeGauge   string = "gauge"
+	MetricsTypeEmpty   string = ""
 )
 
 func NewEmptyMetrics() Metrics {
@@ -36,6 +34,14 @@ func NewCounterRequest(id string) Metrics {
 
 func NewGaugeRequest(id string) Metrics {
 	return Metrics{ID: id, MType: MetricsTypeGauge}
+}
+
+type unavailableMetricsTypeError struct {
+	reason string
+}
+
+func (e unavailableMetricsTypeError) Error() string {
+	return e.reason
 }
 
 func NewCounter(id string, delta int64) Metrics {

@@ -5,8 +5,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -23,7 +25,7 @@ type Reporter struct {
 	batches   bool
 	wg        sync.WaitGroup
 	encryptor crypt.Encryptor
-	ip	      string
+	ip        string
 }
 
 func (reporter *Reporter) ReportMetrics(ctx context.Context, l []schema.Metrics, host string) error {
@@ -36,7 +38,7 @@ func (reporter *Reporter) ReportMetrics(ctx context.Context, l []schema.Metrics,
 		m := m
 		url := fmt.Sprintf("%s/update/", host)
 		eg.Go(utils.WrapGoroutinePanic(func() error {
-			return postSingleRequest(ctx, url, m, reporter.encryptor, reportet.ip)
+			return postSingleRequest(ctx, url, m, reporter.encryptor, reporter.ip)
 		}))
 	}
 
@@ -70,11 +72,11 @@ func (reporter *Reporter) Shutdown() {
 }
 
 func NewReporter(encryptor crypt.Encryptor) (*Reporter, error) {
-	ip, err := getgetRealIP()
+	ip, err := getRealIP()
 	if err != nil {
 		return nil, err
 	}
-	return &Reporter{batches: true, encryptor: encryptor, wg: sync.WaitGroup{}, ip}
+	return &Reporter{batches: true, encryptor: encryptor, wg: sync.WaitGroup{}, ip: ip}, nil
 }
 
 func postSingleRequest(ctx context.Context, url string, m schema.Metrics, encryptor crypt.Encryptor, ip string) error {
@@ -85,7 +87,7 @@ func postSingleRequest(ctx context.Context, url string, m schema.Metrics, encryp
 
 	_, err = postRequest(ctx, url, data, encryptor, map[string]string{
 		"Content-Type": "application/json; charset=UTF-8",
-	})
+	}, ip)
 	return err
 }
 
@@ -99,7 +101,7 @@ func postBatchRequest(ctx context.Context, url string, l []schema.Metrics, encry
 		"Content-Type":     "application/json; charset=UTF-8",
 		"Content-Encoding": "gzip",
 		"Accept-Encoding":  "gzip",
-	})
+	}, ip)
 }
 
 func postRequest(ctx context.Context, url string, data []byte, encryptor crypt.Encryptor, headers map[string]string, ip string) (int, error) {
@@ -147,15 +149,15 @@ func postRequest(ctx context.Context, url string, data []byte, encryptor crypt.E
 	return code, nil
 }
 
-func getgetRealIP() (string, err) {
+func getRealIP() (string, error) {
 	addrs, err := net.InterfaceAddrs()
-    if err != nil {
-        return "", err
-    }
-    for _, address := range addrs {
-        if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+	if err != nil {
+		return "", err
+	}
+	for _, address := range addrs {
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 			return ipnet.IP.String(), nil
-        }
-    }
-    return "", errors.New("unable to obtain IP address")
-} 
+		}
+	}
+	return "", errors.New("unable to obtain IP address")
+}

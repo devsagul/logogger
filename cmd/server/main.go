@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -38,7 +39,7 @@ type config struct {
 	StoreFile        string        `env:"STORE_FILE" json:"store_file"`
 	Key              string        `env:"KEY" json:"key"`
 	DatabaseDSN      string        `env:"DATABASE_DSN" json:"database_dsn"`
-	TrustedSubnet	 string		   `env:"TRUSTED_SUBNET" json:"trusted_subnet"`
+	TrustedSubnet    string        `env:"TRUSTED_SUBNET" json:"trusted_subnet"`
 	StoreInterval    time.Duration `env:"STORE_INTERVAL"`
 	Restore          bool          `env:"RESTORE" json:"restore"`
 }
@@ -54,7 +55,7 @@ func init() {
 	flag.StringVar(&cfg.Key, "k", "", "Secret key to sign metrics (should be shared between server and agent)")
 	flag.StringVar(&cfg.DatabaseDSN, "d", "", "Database connection string")
 	flag.StringVar(&cfg.ConfigFilePath, "c", "", "Path to JSON configuration")
-	flag.TrustedSubnet(&cfg.TrustedSubnet, "t", "", "CIDR representation of trusted subnet")
+	flag.StringVar(&cfg.TrustedSubnet, "t", "", "CIDR representation of trusted subnet")
 }
 
 func main() {
@@ -93,6 +94,12 @@ func main() {
 	log.Printf("DSN: %v", cfg.DatabaseDSN)
 
 	decryptor, err := crypt.NewDecryptor(cfg.CryptoKey)
+	if err != nil {
+		log.Println("Could not setup encryption")
+		os.Exit(1)
+	}
+
+	_, trustedSubnet, err := net.ParseCIDR(cfg.TrustedSubnet)
 	if err != nil {
 		log.Println("Could not setup encryption")
 		os.Exit(1)
@@ -164,9 +171,10 @@ func main() {
 	}()
 
 	log.Println("Initializing application...")
-	app := server.NewApp(store).WithDumper(d).WithDumpInterval(cfg.StoreInterval).WithKey(cfg.Key).WithDecryptor(decryptor)
+	app := server.NewApp(store).WithDumper(d).WithDumpInterval(cfg.StoreInterval).WithKey(cfg.Key)
+	srv := server.NewHttpServer(app).WithDecryptor(decryptor).WithTrustedSubnet(trustedSubnet)
 	log.Println("Listening...")
-	server := http.Server{Addr: cfg.Address, Handler: app.Router}
+	server := http.Server{Addr: cfg.Address, Handler: srv.Router}
 	idleConnsClosed := make(chan struct{})
 	sigint := make(chan os.Signal, 1)
 	signal.Notify(sigint, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)

@@ -123,7 +123,10 @@ func main() {
 		}
 	}), time.Minute)()
 
-	reporter := reporter.NewReporter(encryptor)
+	reporter, err := reporter.NewReporter(encryptor)
+	if err != nil {
+		log.Fatal("could not initialize application")
+	}
 
 	go utils.RetryForever(utils.WrapGoroutinePanic(func() error {
 		for {
