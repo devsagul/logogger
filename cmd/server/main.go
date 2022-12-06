@@ -100,10 +100,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	_, trustedSubnet, err := net.ParseCIDR(cfg.TrustedSubnet)
-	if err != nil {
-		log.Println("Could not setup encryption")
-		os.Exit(1)
+	var trustedSubnet *net.IPNet
+
+	if cfg.TrustedSubnet == "" {
+		trustedSubnet = nil
+	} else {
+		_, trustedSubnet, err = net.ParseCIDR(cfg.TrustedSubnet)
+		if err != nil {
+			log.Println("Could not setup trusted subnet")
+			os.Exit(1)
+		}
 	}
 
 	var store storage.MetricsStorage

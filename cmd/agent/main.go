@@ -95,9 +95,11 @@ func main() {
 
 	var reportHost = cfg.ReportHost
 
-	r := regexp.MustCompile(`https?://`)
-	if !r.MatchString(cfg.ReportHost) {
-		reportHost = fmt.Sprintf("http://%s", reportHost)
+	if cfg.Protocol != "grpc" {
+		r := regexp.MustCompile(`https?://`)
+		if !r.MatchString(cfg.ReportHost) {
+			reportHost = fmt.Sprintf("http://%s", reportHost)
+		}
 	}
 
 	pollTicker := time.NewTicker(cfg.PollInterval)

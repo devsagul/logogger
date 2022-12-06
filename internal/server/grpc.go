@@ -125,8 +125,7 @@ func (server *GRPCServer) Serve(address string) error {
 	}
 	// создаём gRPC-сервер без зарегистрированной службы
 	server.wrapped = grpc.NewServer(
-		grpc.UnaryInterceptor(server.trustedSubnetInterceptor),
-		grpc.UnaryInterceptor(server.decryptionInterceptor),
+		grpc.ChainUnaryInterceptor(server.trustedSubnetInterceptor, server.decryptionInterceptor),
 	)
 	// регистрируем сервис
 	proto.RegisterLogoggerServer(server.wrapped, server)
