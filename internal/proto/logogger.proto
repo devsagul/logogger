@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package logogger;
+option go_package = "internal/proto";
+
+message MetricsValue {
+  string type = 1;
+  string id = 2;
+  optional sint64 delta = 3;
+  optional double value = 4;
+  string hash = 5;
+}
+
+message MetricsList {
+  repeated MetricsValue metrics = 1;
+}
+
+message Empty{};
+
+
+service Logogger {
+  rpc RetrieveValue(MetricsValue) returns (MetricsValue);
+  rpc ListValues(Empty) returns (MetricsList);
+  rpc UpdateValue(MetricsValue) returns (MetricsValue);
+  rpc UpdateValues(MetricsList) returns (MetricsList);
+  rpc Ping(Empty) returns (Empty);
+}

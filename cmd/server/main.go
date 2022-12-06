@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/http"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -38,6 +38,8 @@ type config struct {
 	StoreFile        string        `env:"STORE_FILE" json:"store_file"`
 	Key              string        `env:"KEY" json:"key"`
 	DatabaseDSN      string        `env:"DATABASE_DSN" json:"database_dsn"`
+	TrustedSubnet    string        `env:"TRUSTED_SUBNET" json:"trusted_subnet"`
+	Protocol         string        `env:"PROTOCOL" json:"protocol"`
 	StoreInterval    time.Duration `env:"STORE_INTERVAL"`
 	Restore          bool          `env:"RESTORE" json:"restore"`
 }
@@ -53,6 +55,8 @@ func init() {
 	flag.StringVar(&cfg.Key, "k", "", "Secret key to sign metrics (should be shared between server and agent)")
 	flag.StringVar(&cfg.DatabaseDSN, "d", "", "Database connection string")
 	flag.StringVar(&cfg.ConfigFilePath, "c", "", "Path to JSON configuration")
+	flag.StringVar(&cfg.TrustedSubnet, "t", "", "CIDR representation of trusted subnet")
+	flag.StringVar(&cfg.Protocol, "p", "http", "Communication protocol (http/grpc)")
 }
 
 func main() {
@@ -65,17 +69,17 @@ func main() {
 	}
 
 	if len(cfg.ConfigFilePath) > 0 {
-		data, err := os.ReadFile(cfg.ConfigFilePath)
-		if err != nil {
-			log.Fatal("Could not read config file : ", err)
+		data, e := os.ReadFile(cfg.ConfigFilePath)
+		if e != nil {
+			log.Fatal("Could not read config file : ", e)
 		}
-		err = json.Unmarshal(data, &cfg)
-		if err != nil {
-			log.Fatal("Could not parse config file : ", err)
+		e = json.Unmarshal(data, &cfg)
+		if e != nil {
+			log.Fatal("Could not parse config file : ", e)
 		}
-		cfg.StoreInterval, err = time.ParseDuration(cfg.RawStoreInterval)
-		if err != nil {
-			log.Fatal("Could not parse config file : ", err)
+		cfg.StoreInterval, e = time.ParseDuration(cfg.RawStoreInterval)
+		if e != nil {
+			log.Fatal("Could not parse config file : ", e)
 		}
 	}
 
@@ -94,6 +98,18 @@ func main() {
 	if err != nil {
 		log.Println("Could not setup encryption")
 		os.Exit(1)
+	}
+
+	var trustedSubnet *net.IPNet
+
+	if cfg.TrustedSubnet == "" {
+		trustedSubnet = nil
+	} else {
+		_, trustedSubnet, err = net.ParseCIDR(cfg.TrustedSubnet)
+		if err != nil {
+			log.Println("Could not setup trusted subnet")
+			os.Exit(1)
+		}
 	}
 
 	var store storage.MetricsStorage
@@ -162,23 +178,32 @@ func main() {
 	}()
 
 	log.Println("Initializing application...")
-	app := server.NewApp(store).WithDumper(d).WithDumpInterval(cfg.StoreInterval).WithKey(cfg.Key).WithDecryptor(decryptor)
+	app := server.NewApp(store).WithDumper(d).WithDumpInterval(cfg.StoreInterval).WithKey(cfg.Key)
+
+	var srv server.Server
+
+	if cfg.Protocol == "grpc" {
+		srv = server.NewGRPCServer(app)
+	} else {
+		srv = server.NewHTTPServer(app)
+	}
+	srv = srv.WithDecryptor(decryptor).WithTrustedSubnet(trustedSubnet)
 	log.Println("Listening...")
-	server := http.Server{Addr: cfg.Address, Handler: app.Router}
+
 	idleConnsClosed := make(chan struct{})
 	sigint := make(chan os.Signal, 1)
 	signal.Notify(sigint, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go func() {
 		<-sigint
-		if err := server.Shutdown(context.Background()); err != nil {
-			log.Printf("HTTP server Shutdown: %v", err)
+		err = srv.Shutdown(idleConnsClosed)
+		if err != nil {
+			log.Fatal("Error Shutting down the Server : ", err)
 		}
-		close(idleConnsClosed)
 	}()
 
-	err = server.ListenAndServe()
+	err = srv.Serve(cfg.Address)
 	if err != nil {
-		log.Fatal("Error Starting the HTTP Server : ", err)
+		log.Fatal("Error Starting the Server : ", err)
 	}
 	<-idleConnsClosed
 	fmt.Println("Server Shutdown gracefully")
